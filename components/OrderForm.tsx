@@ -25,11 +25,19 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Nouveau produit temporaire
   const [newItem, setNewItem] = useState<Partial<CartItem>>({
     product_type: 'affiches',
     quantity: 100,
   });
+
+  useEffect(() => {
+    if (mairieInfo.same_as_billing) {
+      setMairieInfo((prev) => ({
+        ...prev,
+        shipping_address: { ...prev.billing_address },
+      }));
+    }
+  }, [mairieInfo.same_as_billing, mairieInfo.billing_address]);
 
   const handleAddToCart = () => {
     if (!newItem.product_type || !newItem.quantity || newItem.quantity < 1) {
@@ -37,13 +45,12 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
       return;
     }
 
-    const product = productsConfig.products.find(p => p.type === newItem.product_type);
+    const product = productsConfig.products.find((p) => p.type === newItem.product_type);
     if (!product) return;
 
-    // Vérifier que toutes les options sont remplies
     const options = productsConfig.options[newItem.product_type as ProductType];
     const selectedOptions: any = {};
-    
+
     for (const key in options) {
       const value = (newItem as any)[key];
       if (!value) {
@@ -61,8 +68,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     };
 
     setCart([...cart, cartItem]);
-    
-    // Reset form
+
     setNewItem({
       product_type: 'affiches',
       quantity: 100,
@@ -87,13 +93,18 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     setLoading(true);
     setError(null);
 
+    const payloadMairieInfo =
+      mairieInfo.same_as_billing
+        ? { ...mairieInfo, shipping_address: { ...mairieInfo.billing_address } }
+        : mairieInfo;
+
     try {
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: cart,
-          mairie_info: mairieInfo,
+          mairie_info: payloadMairieInfo,
           accept_cgv: acceptCgv,
         }),
       });
@@ -104,7 +115,6 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
         throw new Error(data.error || 'Erreur lors de la création de la session');
       }
 
-      // Rediriger vers Stripe Checkout
       if (data.url) {
         window.location.href = data.url;
       }
@@ -130,11 +140,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             {s}
           </div>
           {s < 3 && (
-            <div
-              className={`w-20 h-1 ${
-                s < step ? 'bg-primary-600' : 'bg-gray-200'
-              }`}
-            />
+            <div className={`w-20 h-1 ${s < step ? 'bg-primary-600' : 'bg-gray-200'}`} />
           )}
         </div>
       ))}
@@ -145,10 +151,9 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     <div>
       <h2 className="text-2xl font-bold mb-6">Étape 1: Choisissez vos produits</h2>
 
-      {/* Formulaire d'ajout */}
       <div className="card mb-6">
         <h3 className="font-bold mb-4">Ajouter un produit</h3>
-        
+
         <div className="grid md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="label">Type de produit</label>
@@ -177,7 +182,6 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
           </div>
         </div>
 
-        {/* Options dynamiques selon le produit */}
         {newItem.product_type && (
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             {Object.entries(productsConfig.options[newItem.product_type as ProductType]).map(([key, values]) => (
@@ -206,10 +210,11 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
         </button>
       </div>
 
-      {/* Panier */}
       {cart.length > 0 && (
         <div className="card">
-          <h3 className="font-bold mb-4">Votre panier ({cart.length} article{cart.length > 1 ? 's' : ''})</h3>
+          <h3 className="font-bold mb-4">
+            Votre panier ({cart.length} article{cart.length > 1 ? 's' : ''})
+          </h3>
           <div className="space-y-3">
             {cart.map((item, index) => (
               <div key={index} className="flex justify-between items-start border-b pb-3">
@@ -255,7 +260,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
 
       <div className="card mb-6">
         <h3 className="font-bold mb-4">Informations mairie</h3>
-        
+
         <div className="grid md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="label">Nom de la mairie *</label>
@@ -360,15 +365,14 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             <input
               type="checkbox"
               checked={mairieInfo.same_as_billing}
-              onChange={(e) =>
-                setMairieInfo({
-                  ...mairieInfo,
-                  same_as_billing: e.target.checked,
-                  shipping_address: e.target.checked
-                    ? mairieInfo.billing_address
-                    : mairieInfo.shipping_address,
-                })
-              }
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setMairieInfo((prev) => ({
+                  ...prev,
+                  same_as_billing: checked,
+                  shipping_address: checked ? { ...prev.billing_address } : { ...prev.shipping_address },
+                }));
+              }}
               className="mr-2"
             />
             <span className="text-sm">Adresse de livraison identique</span>
@@ -463,7 +467,6 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
       <h2 className="text-2xl font-bold mb-6">Étape 3: Récapitulatif et paiement</h2>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Récapitulatif commande */}
         <div className="card">
           <h3 className="font-bold mb-4">Votre commande</h3>
           <div className="space-y-3 mb-4">
@@ -481,34 +484,46 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
               </div>
             ))}
           </div>
-          <p className="text-sm text-gray-600">
-            Les prix seront calculés et affichés avant le paiement.
-          </p>
+          <p className="text-sm text-gray-600">Les prix seront calculés et affichés avant le paiement.</p>
         </div>
 
-        {/* Informations mairie */}
         <div className="card">
           <h3 className="font-bold mb-4">Informations de livraison</h3>
           <div className="space-y-2 text-sm">
-            <p><strong>Mairie:</strong> {mairieInfo.mairie_name}</p>
-            <p><strong>Commune:</strong> {mairieInfo.commune}</p>
-            <p><strong>Email:</strong> {mairieInfo.email}</p>
-            <p><strong>Téléphone:</strong> {mairieInfo.phone}</p>
-            <p className="pt-2"><strong>Facturation:</strong></p>
+            <p>
+              <strong>Mairie:</strong> {mairieInfo.mairie_name}
+            </p>
+            <p>
+              <strong>Commune:</strong> {mairieInfo.commune}
+            </p>
+            <p>
+              <strong>Email:</strong> {mairieInfo.email}
+            </p>
+            <p>
+              <strong>Téléphone:</strong> {mairieInfo.phone}
+            </p>
+            <p className="pt-2">
+              <strong>Facturation:</strong>
+            </p>
             <p>{mairieInfo.billing_address.street}</p>
-            <p>{mairieInfo.billing_address.postal_code} {mairieInfo.billing_address.city}</p>
+            <p>
+              {mairieInfo.billing_address.postal_code} {mairieInfo.billing_address.city}
+            </p>
             {!mairieInfo.same_as_billing && (
               <>
-                <p className="pt-2"><strong>Livraison:</strong></p>
+                <p className="pt-2">
+                  <strong>Livraison:</strong>
+                </p>
                 <p>{mairieInfo.shipping_address.street}</p>
-                <p>{mairieInfo.shipping_address.postal_code} {mairieInfo.shipping_address.city}</p>
+                <p>
+                  {mairieInfo.shipping_address.postal_code} {mairieInfo.shipping_address.city}
+                </p>
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* CGV */}
       <div className="card mt-6">
         <label className="flex items-start">
           <input
@@ -518,11 +533,11 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             className="mt-1 mr-3"
           />
           <span className="text-sm">
-            J&apos;accepte les{' '}
+            J&apos;accepte les{" "}
             <a href="/cgv" target="_blank" className="text-primary-600 underline">
               conditions générales de vente
-            </a>{' '}
-            et la{' '}
+            </a>{" "}
+            et la{" "}
             <a href="/confidentialite" target="_blank" className="text-primary-600 underline">
               politique de confidentialité
             </a>
