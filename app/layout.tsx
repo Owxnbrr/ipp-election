@@ -24,7 +24,7 @@ export default function RootLayout({
             <div className="container mx-auto px-4 py-4">
               <nav className="flex items-center justify-between">
                 <Link href="/" className="text-2xl font-bold text-primary-600">
-                  ElectionPrint
+                  IPP Print
                 </Link>
                 <div className="flex items-center gap-6">
                   <Link 
