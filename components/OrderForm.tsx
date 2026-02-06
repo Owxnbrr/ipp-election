@@ -1,9 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { CartItem, MairieInfo, ProductType, ProductConfig } from '@/types';
-import { formatCents } from '@/lib/pricing';
-import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { CartItem, MairieInfo, ProductType, ProductConfig } from "@/types";
+import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
 
 interface OrderFormProps {
   productsConfig: ProductConfig;
@@ -13,12 +12,12 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
   const [step, setStep] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mairieInfo, setMairieInfo] = useState<MairieInfo>({
-    mairie_name: '',
-    commune: '',
-    email: '',
-    phone: '',
-    billing_address: { street: '', postal_code: '', city: '', country: 'France' },
-    shipping_address: { street: '', postal_code: '', city: '', country: 'France' },
+    mairie_name: "",
+    commune: "",
+    email: "",
+    phone: "",
+    billing_address: { street: "", postal_code: "", city: "", country: "France" },
+    shipping_address: { street: "", postal_code: "", city: "", country: "France" },
     same_as_billing: true,
   });
   const [acceptCgv, setAcceptCgv] = useState(false);
@@ -26,22 +25,27 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [newItem, setNewItem] = useState<Partial<CartItem>>({
-    product_type: 'affiches',
+    product_type: "affiches",
     quantity: 100,
   });
 
   useEffect(() => {
-    if (mairieInfo.same_as_billing) {
-      setMairieInfo((prev) => ({
-        ...prev,
-        shipping_address: { ...prev.billing_address },
-      }));
-    }
-  }, [mairieInfo.same_as_billing, mairieInfo.billing_address]);
+    if (!mairieInfo.same_as_billing) return;
+    setMairieInfo((prev) => ({
+      ...prev,
+      shipping_address: { ...prev.billing_address },
+    }));
+  }, [
+    mairieInfo.same_as_billing,
+    mairieInfo.billing_address.street,
+    mairieInfo.billing_address.postal_code,
+    mairieInfo.billing_address.city,
+    mairieInfo.billing_address.country,
+  ]);
 
   const handleAddToCart = () => {
     if (!newItem.product_type || !newItem.quantity || newItem.quantity < 1) {
-      alert('Veuillez remplir tous les champs');
+      alert("Veuillez remplir tous les champs");
       return;
     }
 
@@ -49,7 +53,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     if (!product) return;
 
     const options = productsConfig.options[newItem.product_type as ProductType];
-    const selectedOptions: any = {};
+    const selectedOptions: Record<string, string> = {};
 
     for (const key in options) {
       const value = (newItem as any)[key];
@@ -63,45 +67,41 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     const cartItem: CartItem = {
       product_type: newItem.product_type as ProductType,
       product_name: product.name,
-      options: selectedOptions,
+      options: selectedOptions as any,
       quantity: newItem.quantity,
     };
 
-    setCart([...cart, cartItem]);
-
-    setNewItem({
-      product_type: 'affiches',
-      quantity: 100,
-    });
+    setCart((prev) => [...prev, cartItem]);
+    setNewItem({ product_type: "affiches", quantity: 100 });
   };
 
   const handleRemoveFromCart = (index: number) => {
-    setCart(cart.filter((_, i) => i !== index));
+    setCart((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
     if (cart.length === 0) {
-      alert('Votre panier est vide');
+      alert("Votre panier est vide");
       return;
     }
 
     if (!acceptCgv) {
-      alert('Vous devez accepter les CGV');
+      alert("Vous devez accepter les CGV");
       return;
     }
-
-    setLoading(true);
-    setError(null);
 
     const payloadMairieInfo =
       mairieInfo.same_as_billing
         ? { ...mairieInfo, shipping_address: { ...mairieInfo.billing_address } }
         : mairieInfo;
 
+    setLoading(true);
+    setError(null);
+
     try {
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart,
           mairie_info: payloadMairieInfo,
@@ -112,7 +112,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la création de la session');
+        throw new Error(data.error || "Erreur lors de la création de la session");
       }
 
       if (data.url) {
@@ -131,17 +131,15 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
           <div
             className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
               s === step
-                ? 'bg-primary-600 text-white'
+                ? "bg-primary-600 text-white"
                 : s < step
-                ? 'bg-primary-200 text-primary-700'
-                : 'bg-gray-200 text-gray-500'
+                ? "bg-primary-200 text-primary-700"
+                : "bg-gray-200 text-gray-500"
             }`}
           >
             {s}
           </div>
-          {s < 3 && (
-            <div className={`w-20 h-1 ${s < step ? 'bg-primary-600' : 'bg-gray-200'}`} />
-          )}
+          {s < 3 && <div className={`w-20 h-1 ${s < step ? "bg-primary-600" : "bg-gray-200"}`} />}
         </div>
       ))}
     </div>
@@ -177,7 +175,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
               className="input"
               min="1"
               value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) })}
+              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value || "0", 10) })}
             />
           </div>
         </div>
@@ -189,7 +187,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
                 <label className="label capitalize">{key}</label>
                 <select
                   className="input"
-                  value={(newItem as any)[key] || ''}
+                  value={(newItem as any)[key] || ""}
                   onChange={(e) => setNewItem({ ...newItem, [key]: e.target.value })}
                 >
                   <option value="">Sélectionner</option>
@@ -213,7 +211,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
       {cart.length > 0 && (
         <div className="card">
           <h3 className="font-bold mb-4">
-            Votre panier ({cart.length} article{cart.length > 1 ? 's' : ''})
+            Votre panier ({cart.length} article{cart.length > 1 ? "s" : ""})
           </h3>
           <div className="space-y-3">
             {cart.map((item, index) => (
@@ -223,16 +221,13 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
                   <p className="text-sm text-gray-600">
                     {Object.entries(item.options).map(([key, value]) => (
                       <span key={key} className="mr-2">
-                        {key}: {value}
+                        {key}: {String(value)}
                       </span>
                     ))}
                   </p>
                   <p className="text-sm text-gray-600">Quantité: {item.quantity}</p>
                 </div>
-                <button
-                  onClick={() => handleRemoveFromCart(index)}
-                  className="text-red-600 hover:text-red-800 text-sm"
-                >
+                <button onClick={() => handleRemoveFromCart(index)} className="text-red-600 hover:text-red-800 text-sm">
                   Retirer
                 </button>
               </div>
@@ -364,15 +359,14 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
           <label className="flex items-center">
             <input
               type="checkbox"
-              checked={mairieInfo.same_as_billing}
-              onChange={(e) => {
-                const checked = e.target.checked;
+              checked={!!mairieInfo.same_as_billing}
+              onChange={(e) =>
                 setMairieInfo((prev) => ({
                   ...prev,
-                  same_as_billing: checked,
-                  shipping_address: checked ? { ...prev.billing_address } : { ...prev.shipping_address },
-                }));
-              }}
+                  same_as_billing: e.target.checked,
+                  shipping_address: e.target.checked ? { ...prev.billing_address } : prev.shipping_address,
+                }))
+              }
               className="mr-2"
             />
             <span className="text-sm">Adresse de livraison identique</span>
@@ -476,7 +470,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
                 <p className="text-sm text-gray-600">
                   {Object.entries(item.options).map(([key, value]) => (
                     <span key={key} className="mr-2">
-                      {key}: {value}
+                      {key}: {String(value)}
                     </span>
                   ))}
                 </p>
@@ -545,23 +539,15 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
         </label>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mt-4">
-          {error}
-        </div>
-      )}
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mt-4">{error}</div>}
 
       <div className="flex justify-between mt-8">
         <button onClick={() => setStep(2)} className="btn-secondary" disabled={loading}>
           <ChevronLeft className="w-4 h-4 inline mr-2" />
           Retour
         </button>
-        <button
-          onClick={handleSubmit}
-          disabled={!acceptCgv || loading}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Chargement...' : 'Procéder au paiement'}
+        <button onClick={handleSubmit} disabled={!acceptCgv || loading} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+          {loading ? "Chargement..." : "Procéder au paiement"}
         </button>
       </div>
     </div>

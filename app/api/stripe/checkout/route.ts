@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     const { items, mairie_info } = validatedData;
 
     const typedItems = items as unknown as CartItem[];
+
     const priceCalculation = await calculateOrderTotal(typedItems);
 
     const supabase = getServiceSupabase();
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create order items");
     }
 
-    const stripeLineItems: any[] = priceCalculation.items.map((item) => ({
+    const stripeLineItems = priceCalculation.items.map((item) => ({
       price_data: {
         currency: "eur",
         unit_amount: item.unit_price_cents,
@@ -145,22 +146,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (priceCalculation.tva_cents > 0) {
-      stripeLineItems.push({
-        price_data: {
-          currency: "eur",
-          unit_amount: priceCalculation.tva_cents,
-          product_data: {
-            name: "TVA",
-            description: "TVA calculée sur la commande",
-          },
-        },
-        quantity: 1,
-      });
-    }
-
     const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || process.env.BASE_URL || "http://localhost:3000";
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.BASE_URL ||
+      "http://localhost:3000";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -183,6 +172,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Données invalides", details: error.errors }, { status: 400 });
     }
+
     return NextResponse.json({ error: error?.message || "Une erreur est survenue" }, { status: 500 });
   }
 }
