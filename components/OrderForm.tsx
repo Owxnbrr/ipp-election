@@ -518,7 +518,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             className="mt-1 mr-3"
           />
           <span className="text-sm">
-            J'accepte les{' '}
+            J&apos;accepte les{' '}
             <a href="/cgv" target="_blank" className="text-primary-600 underline">
               conditions générales de vente
             </a>{' '}
