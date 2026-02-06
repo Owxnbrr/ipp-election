@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import type { CartItem, MairieInfo, ProductType, ProductConfig } from '@/types';
-import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { CartItem, MairieInfo, ProductType, ProductConfig } from "@/types";
+import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
 
 interface OrderFormProps {
   productsConfig: ProductConfig;
@@ -12,54 +12,52 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
   const [step, setStep] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mairieInfo, setMairieInfo] = useState<MairieInfo>({
-    mairie_name: '',
-    commune: '',
-    email: '',
-    phone: '',
-    billing_address: { street: '', postal_code: '', city: '', country: 'France' },
-    shipping_address: { street: '', postal_code: '', city: '', country: 'France' },
+    mairie_name: "",
+    commune: "",
+    email: "",
+    phone: "",
+    billing_address: { street: "", postal_code: "", city: "", country: "France" },
+    shipping_address: { street: "", postal_code: "", city: "", country: "France" },
     same_as_billing: true,
   });
   const [acceptCgv, setAcceptCgv] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [newItem, setNewItem] = useState<Partial<CartItem>>({
-    product_type: 'affiches',
-    quantity: 100,
+  const [newItem, setNewItem] = useState<any>({
+    product_type: "affiches",
+    quantity: 10,
   });
 
   useEffect(() => {
-    if (!mairieInfo.same_as_billing) return;
-    const b = mairieInfo.billing_address;
-    const s = mairieInfo.shipping_address;
-    if (s.street !== b.street || s.postal_code !== b.postal_code || s.city !== b.city || s.country !== b.country) {
+    if (mairieInfo.same_as_billing) {
       setMairieInfo((prev) => ({
         ...prev,
         shipping_address: { ...prev.billing_address },
       }));
     }
-  }, [mairieInfo.same_as_billing, mairieInfo.billing_address, mairieInfo.shipping_address]);
-
-  const currentOptions = useMemo(() => {
-    if (!newItem.product_type) return null;
-    return productsConfig.options[newItem.product_type as ProductType] || null;
-  }, [newItem.product_type, productsConfig.options]);
+  }, [
+    mairieInfo.same_as_billing,
+    mairieInfo.billing_address.street,
+    mairieInfo.billing_address.postal_code,
+    mairieInfo.billing_address.city,
+    mairieInfo.billing_address.country,
+  ]);
 
   const handleAddToCart = () => {
     if (!newItem.product_type || !newItem.quantity || newItem.quantity < 1) {
-      alert('Veuillez remplir tous les champs');
+      alert("Veuillez remplir tous les champs");
       return;
     }
 
     const product = productsConfig.products.find((p) => p.type === newItem.product_type);
     if (!product) return;
 
-    const options = productsConfig.options[newItem.product_type as ProductType];
-    const selectedOptions: Record<string, string> = {};
+    const optionsConfig = productsConfig.options[newItem.product_type as ProductType] || {};
+    const selectedOptions: Record<string, any> = {};
 
-    for (const key in options) {
-      const value = (newItem as any)[key];
+    for (const key of Object.keys(optionsConfig)) {
+      const value = newItem[key];
       if (!value) {
         alert(`Veuillez sélectionner ${key}`);
         return;
@@ -71,11 +69,15 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
       product_type: newItem.product_type as ProductType,
       product_name: product.name,
       options: selectedOptions as any,
-      quantity: newItem.quantity,
+      quantity: Number(newItem.quantity),
     };
 
     setCart((prev) => [...prev, cartItem]);
-    setNewItem({ product_type: 'affiches', quantity: 100 });
+
+    setNewItem({
+      product_type: "affiches",
+      quantity: 10,
+    });
   };
 
   const handleRemoveFromCart = (index: number) => {
@@ -84,12 +86,11 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
 
   const handleSubmit = async () => {
     if (cart.length === 0) {
-      alert('Votre panier est vide');
+      alert("Votre panier est vide");
       return;
     }
-
     if (!acceptCgv) {
-      alert('Vous devez accepter les CGV');
+      alert("Vous devez accepter les CGV");
       return;
     }
 
@@ -97,31 +98,22 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     setError(null);
 
     try {
-      const payload = {
-        items: cart,
-        mairie_info: {
-          ...mairieInfo,
-          shipping_address: mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address,
-        },
-        accept_cgv: acceptCgv,
-      };
-
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart,
+          mairie_info: mairieInfo,
+          accept_cgv: acceptCgv,
+        }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        const msg = data?.error || 'Erreur lors de la création de la session';
-        throw new Error(msg);
-      }
-
+      if (!response.ok) throw new Error(data.error || "Erreur lors de la création de la session");
       if (data.url) window.location.href = data.url;
     } catch (err: any) {
-      setError(err?.message || 'Une erreur est survenue');
+      setError(err.message);
       setLoading(false);
     }
   };
@@ -132,12 +124,16 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
         <div key={s} className="flex items-center">
           <div
             className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-              s === step ? 'bg-primary-600 text-white' : s < step ? 'bg-primary-200 text-primary-700' : 'bg-gray-200 text-gray-500'
+              s === step
+                ? "bg-primary-600 text-white"
+                : s < step
+                ? "bg-primary-200 text-primary-700"
+                : "bg-gray-200 text-gray-500"
             }`}
           >
             {s}
           </div>
-          {s < 3 && <div className={`w-20 h-1 ${s < step ? 'bg-primary-600' : 'bg-gray-200'}`} />}
+          {s < 3 && <div className={`w-20 h-1 ${s < step ? "bg-primary-600" : "bg-gray-200"}`} />}
         </div>
       ))}
     </div>
@@ -156,11 +152,11 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             <select
               className="input"
               value={newItem.product_type}
-              onChange={(e) => setNewItem({ ...newItem, product_type: e.target.value as ProductType })}
+              onChange={(e) => setNewItem({ ...newItem, product_type: e.target.value })}
             >
-              {productsConfig.products.map((product) => (
-                <option key={product.type} value={product.type}>
-                  {product.name}
+              {productsConfig.products.map((p) => (
+                <option key={p.type} value={p.type}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -173,30 +169,32 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
               className="input"
               min="1"
               value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value || '0', 10) })}
+              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value || "1") })}
             />
           </div>
         </div>
 
-        {newItem.product_type && currentOptions && (
+        {newItem.product_type && (
           <div className="grid md:grid-cols-2 gap-4 mb-4">
-            {Object.entries(currentOptions).map(([key, values]) => (
-              <div key={key}>
-                <label className="label capitalize">{key}</label>
-                <select
-                  className="input"
-                  value={(newItem as any)[key] || ''}
-                  onChange={(e) => setNewItem({ ...newItem, [key]: e.target.value })}
-                >
-                  <option value="">Sélectionner</option>
-                  {values.map((value: string) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            {Object.entries(productsConfig.options[newItem.product_type as ProductType] || {}).map(
+              ([key, values]) => (
+                <div key={key}>
+                  <label className="label capitalize">{key}</label>
+                  <select
+                    className="input"
+                    value={newItem[key] || ""}
+                    onChange={(e) => setNewItem({ ...newItem, [key]: e.target.value })}
+                  >
+                    <option value="">Sélectionner</option>
+                    {(values as string[]).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -208,16 +206,18 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
 
       {cart.length > 0 && (
         <div className="card">
-          <h3 className="font-bold mb-4">Votre panier ({cart.length} article{cart.length > 1 ? 's' : ''})</h3>
+          <h3 className="font-bold mb-4">
+            Votre panier ({cart.length} article{cart.length > 1 ? "s" : ""})
+          </h3>
           <div className="space-y-3">
             {cart.map((item, index) => (
               <div key={index} className="flex justify-between items-start border-b pb-3">
                 <div className="flex-1">
                   <p className="font-medium">{item.product_name}</p>
                   <p className="text-sm text-gray-600">
-                    {Object.entries(item.options as any).map(([key, value]) => (
-                      <span key={key} className="mr-2">
-                        {key}: {String(value)}
+                    {Object.entries(item.options as any).map(([k, v]) => (
+                      <span key={k} className="mr-2">
+                        {k}: {String(v)}
                       </span>
                     ))}
                   </p>
@@ -356,13 +356,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             <input
               type="checkbox"
               checked={!!mairieInfo.same_as_billing}
-              onChange={(e) =>
-                setMairieInfo((prev) => ({
-                  ...prev,
-                  same_as_billing: e.target.checked,
-                  shipping_address: e.target.checked ? prev.billing_address : prev.shipping_address,
-                }))
-              }
+              onChange={(e) => setMairieInfo({ ...mairieInfo, same_as_billing: e.target.checked })}
               className="mr-2"
             />
             <span className="text-sm">Adresse de livraison identique</span>
@@ -441,7 +435,11 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             !mairieInfo.phone ||
             !mairieInfo.billing_address.street ||
             !mairieInfo.billing_address.postal_code ||
-            !mairieInfo.billing_address.city
+            !mairieInfo.billing_address.city ||
+            (!mairieInfo.same_as_billing &&
+              (!mairieInfo.shipping_address.street ||
+                !mairieInfo.shipping_address.postal_code ||
+                !mairieInfo.shipping_address.city))
           }
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -464,9 +462,9 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
               <div key={index} className="border-b pb-3">
                 <p className="font-medium">{item.product_name}</p>
                 <p className="text-sm text-gray-600">
-                  {Object.entries(item.options as any).map(([key, value]) => (
-                    <span key={key} className="mr-2">
-                      {key}: {String(value)}
+                  {Object.entries(item.options as any).map(([k, v]) => (
+                    <span key={k} className="mr-2">
+                      {k}: {String(v)}
                     </span>
                   ))}
                 </p>
@@ -502,10 +500,9 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             <p className="pt-2">
               <strong>Livraison:</strong>
             </p>
-            <p>{(mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address).street}</p>
+            <p>{mairieInfo.shipping_address.street}</p>
             <p>
-              {(mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address).postal_code}{' '}
-              {(mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address).city}
+              {mairieInfo.shipping_address.postal_code} {mairieInfo.shipping_address.city}
             </p>
           </div>
         </div>
@@ -513,13 +510,18 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
 
       <div className="card mt-6">
         <label className="flex items-start">
-          <input type="checkbox" checked={acceptCgv} onChange={(e) => setAcceptCgv(e.target.checked)} className="mt-1 mr-3" />
+          <input
+            type="checkbox"
+            checked={acceptCgv}
+            onChange={(e) => setAcceptCgv(e.target.checked)}
+            className="mt-1 mr-3"
+          />
           <span className="text-sm">
-            J&apos;accepte les{' '}
+            J&apos;accepte les{" "}
             <a href="/cgv" target="_blank" className="text-primary-600 underline">
               conditions générales de vente
-            </a>{' '}
-            et la{' '}
+            </a>{" "}
+            et la{" "}
             <a href="/confidentialite" target="_blank" className="text-primary-600 underline">
               politique de confidentialité
             </a>
@@ -534,8 +536,12 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
           <ChevronLeft className="w-4 h-4 inline mr-2" />
           Retour
         </button>
-        <button onClick={handleSubmit} disabled={!acceptCgv || loading} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? 'Chargement...' : 'Procéder au paiement'}
+        <button
+          onClick={handleSubmit}
+          disabled={!acceptCgv || loading}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? "Chargement..." : "Procéder au paiement"}
         </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-export type ProductType = 'affiches' | 'bulletins' | 'professions_foi';
+export type ProductType = "affiches" | "bulletins" | "professions_foi";
 
 export interface Product {
   id: string;
@@ -21,32 +21,22 @@ export interface PricingRule {
   color: string | null;
   paper: string | null;
   finish_or_fold: string | null;
-  unit_price_cents: number | null;
-  first_qty: number | null;
-  first_price_cents: number | null;
-  step_qty: number | null;
-  step_price_cents: number | null;
-  vat_rate: number | null;
+  unit_price_cents: number;
 }
 
+export type ImpressionMode = "Recto" | "Recto/verso";
+
 export interface AffichesOptions {
-  format: string;
-  couleur: string;
-  papier: string;
-  finition: string;
+  format: "Grand format 594x841" | "Petit format 297x420";
 }
 
 export interface BulletinsOptions {
   format: string;
-  couleur: string;
-  papier: string;
+  impression: ImpressionMode;
 }
 
 export interface ProfessionsFoiOptions {
-  format: string;
-  couleur: string;
-  papier: string;
-  pliage: string;
+  impression: ImpressionMode;
 }
 
 export type ProductOptions = AffichesOptions | BulletinsOptions | ProfessionsFoiOptions;
@@ -79,7 +69,7 @@ export interface MairieInfo {
 
 export interface Order {
   id: string;
-  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'cancelled';
+  status: "pending" | "paid" | "processing" | "shipped" | "cancelled";
   total_ht_cents: number;
   tva_rate: number;
   total_ttc_cents: number;
@@ -123,8 +113,8 @@ export interface PriceCalculation {
     quantity: number;
     unit_price_cents: number;
     line_total_cents: number;
-    vat_rate?: number;
-    vat_cents?: number;
+    tva_rate: number;
+    tva_cents: number;
   }>;
   subtotal_ht_cents: number;
   tva_cents: number;
@@ -137,11 +127,8 @@ export interface ProductConfig {
   options: Record<
     ProductType,
     {
-      format: string[];
-      couleur: string[];
-      papier: string[];
-      finition?: string[];
-      pliage?: string[];
+      format?: string[];
+      impression?: ImpressionMode[];
     }
   >;
 }
