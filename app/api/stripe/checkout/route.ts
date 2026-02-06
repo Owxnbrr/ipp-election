@@ -3,7 +3,7 @@ import { z } from "zod";
 import { stripe } from "@/lib/stripe";
 import { getServiceSupabase } from "@/lib/supabase";
 import { calculateOrderTotal } from "@/lib/pricing";
-import type { CartItem, ProductType } from "@/types";
+import type { CartItem } from "@/types";
 
 const addressSchema = z.object({
   street: z.string().min(1),
@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
     const { items, mairie_info } = validatedData;
 
     const typedItems = items as unknown as CartItem[];
-
     const priceCalculation = await calculateOrderTotal(typedItems);
 
     const supabase = getServiceSupabase();
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
       .insert({
         status: "pending",
         total_ht_cents: priceCalculation.subtotal_ht_cents,
-        tva_rate: 20.0,
+        tva_rate: 0,
         total_ttc_cents: priceCalculation.total_ttc_cents,
         shipping_cents: priceCalculation.shipping_cents,
         currency: "EUR",
@@ -112,23 +111,21 @@ export async function POST(request: NextRequest) {
       line_total_cents: item.line_total_cents,
     }));
 
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(orderItems);
+    const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
 
     if (itemsError) {
       throw new Error("Failed to create order items");
     }
 
-    const stripeLineItems = priceCalculation.items.map((item) => ({
+    const stripeLineItems: any[] = priceCalculation.items.map((item) => ({
       price_data: {
         currency: "eur",
         unit_amount: item.unit_price_cents,
         product_data: {
           name: item.product_name,
           description: Object.entries({ ...item.options })
-          .map(([key, value]) => `${key}: ${String(value)}`)
-          .join(", "),
+            .map(([key, value]) => `${key}: ${String(value)}`)
+            .join(", "),
         },
       },
       quantity: item.quantity,
@@ -148,7 +145,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.BASE_URL || "http://localhost:3000";
+    if (priceCalculation.tva_cents > 0) {
+      stripeLineItems.push({
+        price_data: {
+          currency: "eur",
+          unit_amount: priceCalculation.tva_cents,
+          product_data: {
+            name: "TVA",
+            description: "TVA calculée sur la commande",
+          },
+        },
+        quantity: 1,
+      });
+    }
+
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL || process.env.BASE_URL || "http://localhost:3000";
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -164,23 +176,13 @@ export async function POST(request: NextRequest) {
       locale: "fr",
     });
 
-    await supabase
-      .from("orders")
-      .update({ stripe_session_id: session.id })
-      .eq("id", order.id);
+    await supabase.from("orders").update({ stripe_session_id: session.id }).eq("id", order.id);
 
     return NextResponse.json({ url: session.url, order_id: order.id });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Données invalides", details: error.errors },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Données invalides", details: error.errors }, { status: 400 });
     }
-
-    return NextResponse.json(
-      { error: error?.message || "Une erreur est survenue" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error?.message || "Une erreur est survenue" }, { status: 500 });
   }
 }
