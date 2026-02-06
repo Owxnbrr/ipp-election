@@ -62,7 +62,7 @@ export default function RootLayout({
                 <div>
                   <h3 className="text-white font-bold mb-4">ElectionPrint</h3>
                   <p className="text-sm">
-                    Votre partenaire pour l'impression de documents électoraux.
+                    Votre partenaire pour l&apos;impression de documents électoraux.
                     Service dédié aux mairies françaises.
                   </p>
                 </div>

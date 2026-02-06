@@ -11,7 +11,7 @@ export default function ConfidentialitePage() {
               <p className="text-gray-700">
                 ElectionPrint accorde une grande importance à la protection de vos données personnelles.
                 Cette politique de confidentialité décrit comment nous collectons, utilisons et protégeons
-                vos informations dans le cadre de notre service d'impression électorale.
+                vos informations dans le cadre de notre service d&apos;impression électorale.
               </p>
             </section>
 
@@ -50,8 +50,8 @@ export default function ConfidentialitePage() {
                 Le traitement de vos données personnelles repose sur :
               </p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
-                <li>L'exécution du contrat de vente (traitement de votre commande)</li>
-                <li>Le respect d'obligations légales (comptabilité, facturation)</li>
+                <li>L&apos;exécution du contrat de vente (traitement de votre commande)</li>
+                <li>Le respect d&apos;obligations légales (comptabilité, facturation)</li>
                 <li>Notre intérêt légitime (amélioration du service)</li>
               </ul>
             </section>
@@ -64,7 +64,7 @@ export default function ConfidentialitePage() {
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
                 <li><strong>Stripe :</strong> Pour le traitement sécurisé des paiements</li>
                 <li><strong>Transporteurs :</strong> Pour la livraison de vos commandes</li>
-                <li><strong>Prestataires techniques :</strong> Pour l'hébergement et la maintenance de notre plateforme (Supabase)</li>
+                <li><strong>Prestataires techniques :</strong> Pour l&apos;hébergement et la maintenance de notre plateforme (Supabase)</li>
               </ul>
               <p className="text-gray-700 mt-4">
                 Nous ne vendons jamais vos données à des tiers.
@@ -96,11 +96,11 @@ export default function ConfidentialitePage() {
                 Conformément au RGPD, vous disposez des droits suivants :
               </p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
-                <li><strong>Droit d'accès :</strong> obtenir une copie de vos données</li>
+                <li><strong>Droit d&apos;accès :</strong> obtenir une copie de vos données</li>
                 <li><strong>Droit de rectification :</strong> corriger vos données inexactes</li>
-                <li><strong>Droit à l'effacement :</strong> demander la suppression de vos données</li>
+                <li><strong>Droit à l&apos;effacement :</strong> demander la suppression de vos données</li>
                 <li><strong>Droit à la limitation :</strong> limiter le traitement de vos données</li>
-                <li><strong>Droit d'opposition :</strong> vous opposer au traitement de vos données</li>
+                <li><strong>Droit d&apos;opposition :</strong> vous opposer au traitement de vos données</li>
                 <li><strong>Droit à la portabilité :</strong> recevoir vos données dans un format structuré</li>
               </ul>
               <p className="text-gray-700 mt-4">
@@ -113,7 +113,7 @@ export default function ConfidentialitePage() {
               <p className="text-gray-700">
                 Notre site utilise des cookies essentiels au fonctionnement de la plateforme
                 (gestion du panier, session de paiement). Aucun cookie de tracking publicitaire
-                n'est utilisé.
+                n&apos;est utilisé.
               </p>
             </section>
 
@@ -138,7 +138,7 @@ export default function ConfidentialitePage() {
               </ul>
               <p className="text-gray-700 mt-4">
                 Vous pouvez également introduire une réclamation auprès de la CNIL (Commission
-                Nationale de l'Informatique et des Libertés) si vous estimez que vos droits
+                Nationale de l&apos;Informatique et des Libertés) si vous estimez que vos droits
                 ne sont pas respectés.
               </p>
             </section>

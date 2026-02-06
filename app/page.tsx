@@ -40,7 +40,7 @@ export default function HomePage() {
               </p>
               <ul className="text-sm text-gray-600 space-y-2">
                 <li>✓ Formats variés</li>
-                <li>✓ Haute qualité d'impression</li>
+                <li>✓ Haute qualité d&apos;impression</li>
                 <li>✓ Finition professionnelle</li>
               </ul>
             </div>

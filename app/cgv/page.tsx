@@ -10,7 +10,7 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">1. Objet</h2>
               <p className="text-gray-700">
                 Les présentes Conditions Générales de Vente (CGV) régissent les relations contractuelles
-                entre ElectionPrint et les mairies clientes pour la fourniture de services d'impression
+                entre ElectionPrint et les mairies clientes pour la fourniture de services d&apos;impression
                 de documents électoraux (affiches, bulletins de vote, professions de foi).
               </p>
             </section>
@@ -19,7 +19,7 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">2. Commandes</h2>
               <p className="text-gray-700 mb-4">
                 Les commandes sont passées en ligne via notre plateforme. Toute commande implique
-                l'acceptation sans réserve des présentes CGV.
+                l&apos;acceptation sans réserve des présentes CGV.
               </p>
               <p className="text-gray-700">
                 Une fois la commande validée et le paiement effectué, un email de confirmation
@@ -42,7 +42,7 @@ export default function CGVPage() {
             <section>
               <h2 className="text-2xl font-bold mb-4">4. Paiement</h2>
               <p className="text-gray-700 mb-4">
-                Le paiement s'effectue en ligne par carte bancaire via notre système de paiement
+                Le paiement s&apos;effectue en ligne par carte bancaire via notre système de paiement
                 sécurisé Stripe. Le paiement est requis au moment de la commande.
               </p>
               <p className="text-gray-700">
@@ -57,8 +57,8 @@ export default function CGVPage() {
                 de la commande. Ces délais sont donnés à titre indicatif.
               </p>
               <p className="text-gray-700">
-                La livraison s'effectue à l'adresse indiquée lors de la commande. Le client
-                doit vérifier l'état du colis à la réception et signaler toute anomalie dans
+                La livraison s&apos;effectue à l&apos;adresse indiquée lors de la commande. Le client
+                doit vérifier l&apos;état du colis à la réception et signaler toute anomalie dans
                 les 48 heures.
               </p>
             </section>
@@ -67,8 +67,8 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">6. Droit de rétractation</h2>
               <p className="text-gray-700">
                 En raison de la nature personnalisée des produits (documents électoraux imprimés
-                selon vos spécifications), le droit de rétractation ne peut s'appliquer conformément
-                à l'article L221-28 du Code de la consommation.
+                selon vos spécifications), le droit de rétractation ne peut s&apos;appliquer conformément
+                à l&apos;article L221-28 du Code de la consommation.
               </p>
             </section>
 
@@ -76,7 +76,7 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">7. Garanties et responsabilité</h2>
               <p className="text-gray-700 mb-4">
                 Nous nous engageons à fournir des produits conformes aux normes en vigueur pour
-                les documents électoraux. En cas de défaut de conformité, le client dispose d'un
+                les documents électoraux. En cas de défaut de conformité, le client dispose d&apos;un
                 délai de 48 heures pour nous en informer.
               </p>
               <p className="text-gray-700">
@@ -89,7 +89,7 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">8. Données personnelles</h2>
               <p className="text-gray-700">
                 Les données personnelles collectées lors de la commande sont nécessaires au
-                traitement de celle-ci. Pour plus d'informations, consultez notre{' '}
+                traitement de celle-ci. Pour plus d&apos;informations, consultez notre{' '}
                 <a href="/confidentialite" className="text-primary-600 underline">
                   politique de confidentialité
                 </a>.
@@ -107,7 +107,7 @@ export default function CGVPage() {
             <section>
               <h2 className="text-2xl font-bold mb-4">10. Contact</h2>
               <p className="text-gray-700">
-                Pour toute question concernant nos CGV, vous pouvez nous contacter à l'adresse
+                Pour toute question concernant nos CGV, vous pouvez nous contacter à l&apos;adresse
                 suivante : contact@electionprint.fr ou par téléphone au 01 23 45 67 89.
               </p>
             </section>

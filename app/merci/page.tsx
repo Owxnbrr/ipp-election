@@ -161,7 +161,7 @@ export default async function MerciPage({
           ) : (
             <div className="card text-center">
               <p className="text-gray-600">
-                Nous n'avons pas pu récupérer les détails de votre commande.
+                Nous n&apos;avons pas pu récupérer les détails de votre commande.
                 Un email de confirmation vous a été envoyé.
               </p>
             </div>
@@ -177,7 +177,7 @@ export default async function MerciPage({
               </li>
               <li className="flex items-start">
                 <span className="text-primary-600 mr-2">2.</span>
-                <span>Vous recevrez un email avec le numéro de suivi dès l'expédition</span>
+                <span>Vous recevrez un email avec le numéro de suivi dès l&apos;expédition</span>
               </li>
               <li className="flex items-start">
                 <span className="text-primary-600 mr-2">3.</span>
@@ -189,7 +189,7 @@ export default async function MerciPage({
           {/* CTA */}
           <div className="text-center mt-8">
             <Link href="/" className="btn-primary inline-block">
-              Retour à l'accueil
+              Retour à l&apos;accueil
             </Link>
           </div>
         </div>
