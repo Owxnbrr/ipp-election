@@ -1,9 +1,6 @@
 // lib/pricing.ts
 import type {
-  AfficheFormat,
-  BulletinFormat,
   CartItem,
-  ImpressionType,
   MoneyCents,
   PricedItem,
   PricedOrder,
@@ -19,11 +16,14 @@ const DEFAULT_VAT_RATE = 0.2;
 const ROUNDING_MODE_BY_PRODUCT: Record<ProductKind, RoundingMode> = {
   professions_de_foi: "ceil_to_block",
   bulletins_de_vote: "ceil_to_block",
-  affiches: "none", // affiches: on facture au réel (10 premières + unités)
+  affiches: "none",
 };
 
-// si ceil_to_block : quel bloc sert de base d’arrondi ?
-// => on prend le plus petit block_size des grilles pour ce produit/option
+export function formatCents(cents: number, locale = "fr-FR"): string {
+  const euros = cents / 100;
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(euros);
+}
+
 function roundQuantityIfNeeded(qty: number, blocks: PricingBlockRow[], productKind: ProductKind): number {
   const mode = ROUNDING_MODE_BY_PRODUCT[productKind];
   if (mode === "none") return qty;
@@ -35,7 +35,6 @@ function roundQuantityIfNeeded(qty: number, blocks: PricingBlockRow[], productKi
 }
 
 function labelForBlock(productKind: ProductKind, seq: number, blockSize: number): string {
-  // Tu peux customiser selon tes libellés exacts (“1ère centaine”, “centaines suivantes”…)
   if (productKind === "affiches" && blockSize === 10 && seq === 1) return "10 premières";
   if (productKind === "affiches" && blockSize === 1) return "Unité en plus";
   return `Palier ${seq} (bloc ${blockSize})`;
@@ -55,19 +54,12 @@ function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): Prici
         b.affiche_format === null
       );
     }
-    // affiches
     return b.impression === null && b.bulletin_format === null && b.affiche_format === item.afficheFormat;
   });
 
   return filtered.sort((a, b) => a.seq - b.seq);
 }
 
-/**
- * Applique une grille de "blocs" dans l’ordre:
- * - chaque bloc couvre block_size unités
- * - coûte block_price_cents
- * - max_applications limite combien de fois le bloc peut être appliqué (1 pour “10 premières”)
- */
 function applyBlocksPricing(
   productKind: ProductKind,
   originalQty: number,
@@ -87,16 +79,11 @@ function applyBlocksPricing(
     if (remaining <= 0) break;
 
     const maxApps = b.max_applications ?? Number.POSITIVE_INFINITY;
-
-    // combien de blocs nécessaires pour couvrir le restant ?
-    // ex bloc_size=100, remaining=250 => besoin 3 blocs si on arrondit par bloc (mais on a déjà arrondi globalement)
     const neededApps = Math.ceil(remaining / b.block_size);
-
     const applications = Math.min(neededApps, maxApps);
     if (applications <= 0) continue;
 
     const unitsCovered = Math.min(remaining, applications * b.block_size);
-
     const lineTotal = applications * b.block_price_cents;
     total += lineTotal;
 
@@ -114,7 +101,6 @@ function applyBlocksPricing(
   }
 
   if (remaining > 0) {
-    // Il manque un palier (ex: tu as “1ère centaine” mais pas “centaines suivantes”)
     throw new Error(`Grille incomplète: il reste ${remaining} unités non tarifées pour ${productKind}.`);
   }
 
@@ -129,7 +115,7 @@ export function priceCartItem(item: CartItem, allBlocks: PricingBlockRow[]): Pri
 
   return {
     ...item,
-    quantity: pricedQty, // quantité tarifée (après arrondi éventuel)
+    quantity: pricedQty,
     unitHtCents: unit,
     totalHtCents: totalCents,
     breakdown,

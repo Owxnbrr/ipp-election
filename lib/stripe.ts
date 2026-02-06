@@ -1,12 +1,6 @@
+// lib/stripe.ts
+import "server-only";
 import Stripe from "stripe";
+import { env } from "@/lib/env";
 
-const key = process.env.STRIPE_SECRET_KEY;
-
-if (!key) {
-  throw new Error("Missing STRIPE_SECRET_KEY environment variable");
-}
-
-export const stripe = new Stripe(key, {
-  apiVersion: "2023-10-16",
-  typescript: true,
-});
+export const stripe = new Stripe(env.STRIPE_SECRET_KEY);

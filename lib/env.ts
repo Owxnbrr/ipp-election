@@ -5,7 +5,7 @@ const envSchema = z.object({
   // Stripe
   STRIPE_SECRET_KEY: z.string().min(1),
 
-  // URL site
+  // Public site url
   NEXT_PUBLIC_SITE_URL: z.string().url(),
 
   // Supabase

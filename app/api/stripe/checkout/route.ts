@@ -1,25 +1,18 @@
 // app/api/stripe/checkout/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env";
-import type { NextRequest } from "next/server";
 
+import { env } from "@/lib/env";
+import { stripe } from "@/lib/stripe";
 import type { CartItem, PricingBlockRow, ProductKind } from "@/types";
 import { priceOrder } from "@/lib/pricing";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
+const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
 });
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
-
-// ---- Zod schemas (strict unions)
+// ---- Zod schemas
 const professionsItemSchema = z.object({
   productKind: z.literal("professions_de_foi"),
   quantity: z.number().int().positive(),
@@ -78,7 +71,6 @@ export async function POST(req: Request) {
     const json = await req.json();
     const body = checkoutBodySchema.parse(json);
 
-    // 1) Charger la grille depuis Supabase
     const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
@@ -87,11 +79,8 @@ export async function POST(req: Request) {
     if (blocksErr) throw blocksErr;
 
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
+    const pricedOrder = priceOrder(body.items, allBlocks, 0.2);
 
-    // 2) Pricing serveur
-    const pricedOrder = priceOrder(body.items, allBlocks, 0.2); // TODO: remplacer 0.2 si TVA variable
-
-    // 3) Créer order + order_items
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert({
@@ -152,8 +141,6 @@ export async function POST(req: Request) {
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
 
-    // 4) Stripe checkout line items dynamiques
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -163,21 +150,17 @@ export async function POST(req: Request) {
           currency: "eur",
           product_data: {
             name: itemLabel(it),
-            metadata: {
-              order_id: orderId,
-              product_kind: it.productKind,
-            },
+            metadata: { order_id: orderId, product_kind: it.productKind },
           },
-          unit_amount: it.unitHtCents, // NOTE: ça représente HT “moyen” après paliers/arrondi
+          unit_amount: it.unitHtCents,
         },
         quantity: it.quantity,
       })),
-      success_url: `${siteUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/cart?canceled=1`,
+      success_url: `${env.NEXT_PUBLIC_SITE_URL}/merci?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${env.NEXT_PUBLIC_SITE_URL}/cart?canceled=1`,
       metadata: { order_id: orderId },
     });
 
-    // 5) Enregistrer stripe_session_id
     const { error: updErr } = await supabaseAdmin
       .from("orders")
       .update({ stripe_session_id: session.id })
