@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { CartItem, MairieInfo, ProductType, ProductConfig } from "@/types";
-import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
+import { useEffect, useMemo, useState } from 'react';
+import type { CartItem, MairieInfo, ProductType, ProductConfig } from '@/types';
+import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 
 interface OrderFormProps {
   productsConfig: ProductConfig;
@@ -12,12 +12,12 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
   const [step, setStep] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mairieInfo, setMairieInfo] = useState<MairieInfo>({
-    mairie_name: "",
-    commune: "",
-    email: "",
-    phone: "",
-    billing_address: { street: "", postal_code: "", city: "", country: "France" },
-    shipping_address: { street: "", postal_code: "", city: "", country: "France" },
+    mairie_name: '',
+    commune: '',
+    email: '',
+    phone: '',
+    billing_address: { street: '', postal_code: '', city: '', country: 'France' },
+    shipping_address: { street: '', postal_code: '', city: '', country: 'France' },
     same_as_billing: true,
   });
   const [acceptCgv, setAcceptCgv] = useState(false);
@@ -25,27 +25,30 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [newItem, setNewItem] = useState<Partial<CartItem>>({
-    product_type: "affiches",
+    product_type: 'affiches',
     quantity: 100,
   });
 
   useEffect(() => {
     if (!mairieInfo.same_as_billing) return;
-    setMairieInfo((prev) => ({
-      ...prev,
-      shipping_address: { ...prev.billing_address },
-    }));
-  }, [
-    mairieInfo.same_as_billing,
-    mairieInfo.billing_address.street,
-    mairieInfo.billing_address.postal_code,
-    mairieInfo.billing_address.city,
-    mairieInfo.billing_address.country,
-  ]);
+    const b = mairieInfo.billing_address;
+    const s = mairieInfo.shipping_address;
+    if (s.street !== b.street || s.postal_code !== b.postal_code || s.city !== b.city || s.country !== b.country) {
+      setMairieInfo((prev) => ({
+        ...prev,
+        shipping_address: { ...prev.billing_address },
+      }));
+    }
+  }, [mairieInfo.same_as_billing, mairieInfo.billing_address, mairieInfo.shipping_address]);
+
+  const currentOptions = useMemo(() => {
+    if (!newItem.product_type) return null;
+    return productsConfig.options[newItem.product_type as ProductType] || null;
+  }, [newItem.product_type, productsConfig.options]);
 
   const handleAddToCart = () => {
     if (!newItem.product_type || !newItem.quantity || newItem.quantity < 1) {
-      alert("Veuillez remplir tous les champs");
+      alert('Veuillez remplir tous les champs');
       return;
     }
 
@@ -72,7 +75,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
     };
 
     setCart((prev) => [...prev, cartItem]);
-    setNewItem({ product_type: "affiches", quantity: 100 });
+    setNewItem({ product_type: 'affiches', quantity: 100 });
   };
 
   const handleRemoveFromCart = (index: number) => {
@@ -81,45 +84,44 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
 
   const handleSubmit = async () => {
     if (cart.length === 0) {
-      alert("Votre panier est vide");
+      alert('Votre panier est vide');
       return;
     }
 
     if (!acceptCgv) {
-      alert("Vous devez accepter les CGV");
+      alert('Vous devez accepter les CGV');
       return;
     }
-
-    const payloadMairieInfo =
-      mairieInfo.same_as_billing
-        ? { ...mairieInfo, shipping_address: { ...mairieInfo.billing_address } }
-        : mairieInfo;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart,
-          mairie_info: payloadMairieInfo,
-          accept_cgv: acceptCgv,
-        }),
+      const payload = {
+        items: cart,
+        mairie_info: {
+          ...mairieInfo,
+          shipping_address: mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address,
+        },
+        accept_cgv: acceptCgv,
+      };
+
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erreur lors de la création de la session");
+        const msg = data?.error || 'Erreur lors de la création de la session';
+        throw new Error(msg);
       }
 
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      if (data.url) window.location.href = data.url;
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || 'Une erreur est survenue');
       setLoading(false);
     }
   };
@@ -130,16 +132,12 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
         <div key={s} className="flex items-center">
           <div
             className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-              s === step
-                ? "bg-primary-600 text-white"
-                : s < step
-                ? "bg-primary-200 text-primary-700"
-                : "bg-gray-200 text-gray-500"
+              s === step ? 'bg-primary-600 text-white' : s < step ? 'bg-primary-200 text-primary-700' : 'bg-gray-200 text-gray-500'
             }`}
           >
             {s}
           </div>
-          {s < 3 && <div className={`w-20 h-1 ${s < step ? "bg-primary-600" : "bg-gray-200"}`} />}
+          {s < 3 && <div className={`w-20 h-1 ${s < step ? 'bg-primary-600' : 'bg-gray-200'}`} />}
         </div>
       ))}
     </div>
@@ -175,19 +173,19 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
               className="input"
               min="1"
               value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value || "0", 10) })}
+              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value || '0', 10) })}
             />
           </div>
         </div>
 
-        {newItem.product_type && (
+        {newItem.product_type && currentOptions && (
           <div className="grid md:grid-cols-2 gap-4 mb-4">
-            {Object.entries(productsConfig.options[newItem.product_type as ProductType]).map(([key, values]) => (
+            {Object.entries(currentOptions).map(([key, values]) => (
               <div key={key}>
                 <label className="label capitalize">{key}</label>
                 <select
                   className="input"
-                  value={(newItem as any)[key] || ""}
+                  value={(newItem as any)[key] || ''}
                   onChange={(e) => setNewItem({ ...newItem, [key]: e.target.value })}
                 >
                   <option value="">Sélectionner</option>
@@ -210,16 +208,14 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
 
       {cart.length > 0 && (
         <div className="card">
-          <h3 className="font-bold mb-4">
-            Votre panier ({cart.length} article{cart.length > 1 ? "s" : ""})
-          </h3>
+          <h3 className="font-bold mb-4">Votre panier ({cart.length} article{cart.length > 1 ? 's' : ''})</h3>
           <div className="space-y-3">
             {cart.map((item, index) => (
               <div key={index} className="flex justify-between items-start border-b pb-3">
                 <div className="flex-1">
                   <p className="font-medium">{item.product_name}</p>
                   <p className="text-sm text-gray-600">
-                    {Object.entries(item.options).map(([key, value]) => (
+                    {Object.entries(item.options as any).map(([key, value]) => (
                       <span key={key} className="mr-2">
                         {key}: {String(value)}
                       </span>
@@ -364,7 +360,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
                 setMairieInfo((prev) => ({
                   ...prev,
                   same_as_billing: e.target.checked,
-                  shipping_address: e.target.checked ? { ...prev.billing_address } : prev.shipping_address,
+                  shipping_address: e.target.checked ? prev.billing_address : prev.shipping_address,
                 }))
               }
               className="mr-2"
@@ -468,7 +464,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
               <div key={index} className="border-b pb-3">
                 <p className="font-medium">{item.product_name}</p>
                 <p className="text-sm text-gray-600">
-                  {Object.entries(item.options).map(([key, value]) => (
+                  {Object.entries(item.options as any).map(([key, value]) => (
                     <span key={key} className="mr-2">
                       {key}: {String(value)}
                     </span>
@@ -503,35 +499,27 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
             <p>
               {mairieInfo.billing_address.postal_code} {mairieInfo.billing_address.city}
             </p>
-            {!mairieInfo.same_as_billing && (
-              <>
-                <p className="pt-2">
-                  <strong>Livraison:</strong>
-                </p>
-                <p>{mairieInfo.shipping_address.street}</p>
-                <p>
-                  {mairieInfo.shipping_address.postal_code} {mairieInfo.shipping_address.city}
-                </p>
-              </>
-            )}
+            <p className="pt-2">
+              <strong>Livraison:</strong>
+            </p>
+            <p>{(mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address).street}</p>
+            <p>
+              {(mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address).postal_code}{' '}
+              {(mairieInfo.same_as_billing ? mairieInfo.billing_address : mairieInfo.shipping_address).city}
+            </p>
           </div>
         </div>
       </div>
 
       <div className="card mt-6">
         <label className="flex items-start">
-          <input
-            type="checkbox"
-            checked={acceptCgv}
-            onChange={(e) => setAcceptCgv(e.target.checked)}
-            className="mt-1 mr-3"
-          />
+          <input type="checkbox" checked={acceptCgv} onChange={(e) => setAcceptCgv(e.target.checked)} className="mt-1 mr-3" />
           <span className="text-sm">
-            J&apos;accepte les{" "}
+            J&apos;accepte les{' '}
             <a href="/cgv" target="_blank" className="text-primary-600 underline">
               conditions générales de vente
-            </a>{" "}
-            et la{" "}
+            </a>{' '}
+            et la{' '}
             <a href="/confidentialite" target="_blank" className="text-primary-600 underline">
               politique de confidentialité
             </a>
@@ -547,7 +535,7 @@ export default function OrderForm({ productsConfig }: OrderFormProps) {
           Retour
         </button>
         <button onClick={handleSubmit} disabled={!acceptCgv || loading} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? "Chargement..." : "Procéder au paiement"}
+          {loading ? 'Chargement...' : 'Procéder au paiement'}
         </button>
       </div>
     </div>
