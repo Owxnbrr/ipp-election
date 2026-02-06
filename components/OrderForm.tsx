@@ -1,558 +1,134 @@
+// OrderForm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { CartItem, MairieInfo, ProductType, ProductConfig } from "@/types";
-import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { CartItem, ProductKind, ImpressionType, BulletinFormat, AfficheFormat } from "@/types";
 
-interface OrderFormProps {
-  productsConfig: ProductConfig;
-}
+const productKinds: { value: ProductKind; label: string }[] = [
+  { value: "professions_de_foi", label: "Professions de foi" },
+  { value: "bulletins_de_vote", label: "Bulletins de vote" },
+  { value: "affiches", label: "Affiches" },
+];
 
-export default function OrderForm({ productsConfig }: OrderFormProps) {
-  const [step, setStep] = useState(1);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [mairieInfo, setMairieInfo] = useState<MairieInfo>({
-    mairie_name: "",
-    commune: "",
-    email: "",
-    phone: "",
-    billing_address: { street: "", postal_code: "", city: "", country: "France" },
-    shipping_address: { street: "", postal_code: "", city: "", country: "France" },
-    same_as_billing: true,
-  });
-  const [acceptCgv, setAcceptCgv] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function OrderForm() {
+  const [productKind, setProductKind] = useState<ProductKind>("professions_de_foi");
+  const [quantity, setQuantity] = useState<number>(100);
 
-  const [newItem, setNewItem] = useState<any>({
-    product_type: "affiches",
-    quantity: 10,
-  });
+  const [impression, setImpression] = useState<ImpressionType>("recto");
+  const [bulletinFormat, setBulletinFormat] = useState<BulletinFormat>("liste_5_31");
+  const [afficheFormat, setAfficheFormat] = useState<AfficheFormat>("grand_format");
 
-  useEffect(() => {
-    if (mairieInfo.same_as_billing) {
-      setMairieInfo((prev) => ({
-        ...prev,
-        shipping_address: { ...prev.billing_address },
-      }));
-    }
-  }, [
-    mairieInfo.same_as_billing,
-    mairieInfo.billing_address.street,
-    mairieInfo.billing_address.postal_code,
-    mairieInfo.billing_address.city,
-    mairieInfo.billing_address.country,
-  ]);
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [customerEmail, setCustomerEmail] = useState<string>("");
 
-  const handleAddToCart = () => {
-    if (!newItem.product_type || !newItem.quantity || newItem.quantity < 1) {
-      alert("Veuillez remplir tous les champs");
-      return;
-    }
+  const canUseImpression = productKind === "professions_de_foi" || productKind === "bulletins_de_vote";
 
-    const product = productsConfig.products.find((p) => p.type === newItem.product_type);
-    if (!product) return;
+  const newItem = useMemo<CartItem>(() => {
+    if (productKind === "professions_de_foi") return { productKind, quantity, impression };
+    if (productKind === "bulletins_de_vote") return { productKind, quantity, impression, bulletinFormat };
+    return { productKind, quantity, afficheFormat };
+  }, [productKind, quantity, impression, bulletinFormat, afficheFormat]);
 
-    const optionsConfig = productsConfig.options[newItem.product_type as ProductType] || {};
-    const selectedOptions: Record<string, any> = {};
-
-    for (const key of Object.keys(optionsConfig)) {
-      const value = newItem[key];
-      if (!value) {
-        alert(`Veuillez sélectionner ${key}`);
-        return;
-      }
-      selectedOptions[key] = value;
-    }
-
-    const cartItem: CartItem = {
-      product_type: newItem.product_type as ProductType,
-      product_name: product.name,
-      options: selectedOptions as any,
-      quantity: Number(newItem.quantity),
-    };
-
-    setCart((prev) => [...prev, cartItem]);
-
-    setNewItem({
-      product_type: "affiches",
-      quantity: 10,
+  async function onCheckout() {
+    const res = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerEmail: customerEmail || undefined,
+        items,
+      }),
     });
-  };
 
-  const handleRemoveFromCart = (index: number) => {
-    setCart((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async () => {
-    if (cart.length === 0) {
-      alert("Votre panier est vide");
-      return;
-    }
-    if (!acceptCgv) {
-      alert("Vous devez accepter les CGV");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart,
-          mairie_info: mairieInfo,
-          accept_cgv: acceptCgv,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.error || "Erreur lors de la création de la session");
-      if (data.url) window.location.href = data.url;
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
-      {[1, 2, 3].map((s) => (
-        <div key={s} className="flex items-center">
-          <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-              s === step
-                ? "bg-primary-600 text-white"
-                : s < step
-                ? "bg-primary-200 text-primary-700"
-                : "bg-gray-200 text-gray-500"
-            }`}
-          >
-            {s}
-          </div>
-          {s < 3 && <div className={`w-20 h-1 ${s < step ? "bg-primary-600" : "bg-gray-200"}`} />}
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderStep1 = () => (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Étape 1: Choisissez vos produits</h2>
-
-      <div className="card mb-6">
-        <h3 className="font-bold mb-4">Ajouter un produit</h3>
-
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="label">Type de produit</label>
-            <select
-              className="input"
-              value={newItem.product_type}
-              onChange={(e) => setNewItem({ ...newItem, product_type: e.target.value })}
-            >
-              {productsConfig.products.map((p) => (
-                <option key={p.type} value={p.type}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Quantité</label>
-            <input
-              type="number"
-              className="input"
-              min="1"
-              value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value || "1") })}
-            />
-          </div>
-        </div>
-
-        {newItem.product_type && (
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            {Object.entries(productsConfig.options[newItem.product_type as ProductType] || {}).map(
-              ([key, values]) => (
-                <div key={key}>
-                  <label className="label capitalize">{key}</label>
-                  <select
-                    className="input"
-                    value={newItem[key] || ""}
-                    onChange={(e) => setNewItem({ ...newItem, [key]: e.target.value })}
-                  >
-                    <option value="">Sélectionner</option>
-                    {(values as string[]).map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )
-            )}
-          </div>
-        )}
-
-        <button onClick={handleAddToCart} className="btn-primary">
-          <ShoppingCart className="w-4 h-4 inline mr-2" />
-          Ajouter au panier
-        </button>
-      </div>
-
-      {cart.length > 0 && (
-        <div className="card">
-          <h3 className="font-bold mb-4">
-            Votre panier ({cart.length} article{cart.length > 1 ? "s" : ""})
-          </h3>
-          <div className="space-y-3">
-            {cart.map((item, index) => (
-              <div key={index} className="flex justify-between items-start border-b pb-3">
-                <div className="flex-1">
-                  <p className="font-medium">{item.product_name}</p>
-                  <p className="text-sm text-gray-600">
-                    {Object.entries(item.options as any).map(([k, v]) => (
-                      <span key={k} className="mr-2">
-                        {k}: {String(v)}
-                      </span>
-                    ))}
-                  </p>
-                  <p className="text-sm text-gray-600">Quantité: {item.quantity}</p>
-                </div>
-                <button onClick={() => handleRemoveFromCart(index)} className="text-red-600 hover:text-red-800 text-sm">
-                  Retirer
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-8 flex justify-end">
-        <button
-          onClick={() => setStep(2)}
-          disabled={cart.length === 0}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Continuer
-          <ChevronRight className="w-4 h-4 inline ml-2" />
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderStep2 = () => (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Étape 2: Informations de livraison</h2>
-
-      <div className="card mb-6">
-        <h3 className="font-bold mb-4">Informations mairie</h3>
-
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="label">Nom de la mairie *</label>
-            <input
-              type="text"
-              className="input"
-              value={mairieInfo.mairie_name}
-              onChange={(e) => setMairieInfo({ ...mairieInfo, mairie_name: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="label">Commune *</label>
-            <input
-              type="text"
-              className="input"
-              value={mairieInfo.commune}
-              onChange={(e) => setMairieInfo({ ...mairieInfo, commune: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="label">Email *</label>
-            <input
-              type="email"
-              className="input"
-              value={mairieInfo.email}
-              onChange={(e) => setMairieInfo({ ...mairieInfo, email: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="label">Téléphone *</label>
-            <input
-              type="tel"
-              className="input"
-              value={mairieInfo.phone}
-              onChange={(e) => setMairieInfo({ ...mairieInfo, phone: e.target.value })}
-              required
-            />
-          </div>
-        </div>
-
-        <h4 className="font-bold mb-4 mt-6">Adresse de facturation</h4>
-        <div className="space-y-4 mb-4">
-          <div>
-            <label className="label">Adresse *</label>
-            <input
-              type="text"
-              className="input"
-              value={mairieInfo.billing_address.street}
-              onChange={(e) =>
-                setMairieInfo({
-                  ...mairieInfo,
-                  billing_address: { ...mairieInfo.billing_address, street: e.target.value },
-                })
-              }
-              required
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Code postal *</label>
-              <input
-                type="text"
-                className="input"
-                value={mairieInfo.billing_address.postal_code}
-                onChange={(e) =>
-                  setMairieInfo({
-                    ...mairieInfo,
-                    billing_address: { ...mairieInfo.billing_address, postal_code: e.target.value },
-                  })
-                }
-                required
-              />
-            </div>
-
-            <div>
-              <label className="label">Ville *</label>
-              <input
-                type="text"
-                className="input"
-                value={mairieInfo.billing_address.city}
-                onChange={(e) =>
-                  setMairieInfo({
-                    ...mairieInfo,
-                    billing_address: { ...mairieInfo.billing_address, city: e.target.value },
-                  })
-                }
-                required
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={!!mairieInfo.same_as_billing}
-              onChange={(e) => setMairieInfo({ ...mairieInfo, same_as_billing: e.target.checked })}
-              className="mr-2"
-            />
-            <span className="text-sm">Adresse de livraison identique</span>
-          </label>
-        </div>
-
-        {!mairieInfo.same_as_billing && (
-          <>
-            <h4 className="font-bold mb-4 mt-6">Adresse de livraison</h4>
-            <div className="space-y-4">
-              <div>
-                <label className="label">Adresse *</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={mairieInfo.shipping_address.street}
-                  onChange={(e) =>
-                    setMairieInfo({
-                      ...mairieInfo,
-                      shipping_address: { ...mairieInfo.shipping_address, street: e.target.value },
-                    })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Code postal *</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={mairieInfo.shipping_address.postal_code}
-                    onChange={(e) =>
-                      setMairieInfo({
-                        ...mairieInfo,
-                        shipping_address: { ...mairieInfo.shipping_address, postal_code: e.target.value },
-                      })
-                    }
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="label">Ville *</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={mairieInfo.shipping_address.city}
-                    onChange={(e) =>
-                      setMairieInfo({
-                        ...mairieInfo,
-                        shipping_address: { ...mairieInfo.shipping_address, city: e.target.value },
-                      })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="flex justify-between">
-        <button onClick={() => setStep(1)} className="btn-secondary">
-          <ChevronLeft className="w-4 h-4 inline mr-2" />
-          Retour
-        </button>
-        <button
-          onClick={() => setStep(3)}
-          disabled={
-            !mairieInfo.mairie_name ||
-            !mairieInfo.commune ||
-            !mairieInfo.email ||
-            !mairieInfo.phone ||
-            !mairieInfo.billing_address.street ||
-            !mairieInfo.billing_address.postal_code ||
-            !mairieInfo.billing_address.city ||
-            (!mairieInfo.same_as_billing &&
-              (!mairieInfo.shipping_address.street ||
-                !mairieInfo.shipping_address.postal_code ||
-                !mairieInfo.shipping_address.city))
-          }
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Continuer
-          <ChevronRight className="w-4 h-4 inline ml-2" />
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderStep3 = () => (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Étape 3: Récapitulatif et paiement</h2>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h3 className="font-bold mb-4">Votre commande</h3>
-          <div className="space-y-3 mb-4">
-            {cart.map((item, index) => (
-              <div key={index} className="border-b pb-3">
-                <p className="font-medium">{item.product_name}</p>
-                <p className="text-sm text-gray-600">
-                  {Object.entries(item.options as any).map(([k, v]) => (
-                    <span key={k} className="mr-2">
-                      {k}: {String(v)}
-                    </span>
-                  ))}
-                </p>
-                <p className="text-sm text-gray-600">Quantité: {item.quantity}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-sm text-gray-600">Les prix seront calculés et affichés avant le paiement.</p>
-        </div>
-
-        <div className="card">
-          <h3 className="font-bold mb-4">Informations de livraison</h3>
-          <div className="space-y-2 text-sm">
-            <p>
-              <strong>Mairie:</strong> {mairieInfo.mairie_name}
-            </p>
-            <p>
-              <strong>Commune:</strong> {mairieInfo.commune}
-            </p>
-            <p>
-              <strong>Email:</strong> {mairieInfo.email}
-            </p>
-            <p>
-              <strong>Téléphone:</strong> {mairieInfo.phone}
-            </p>
-            <p className="pt-2">
-              <strong>Facturation:</strong>
-            </p>
-            <p>{mairieInfo.billing_address.street}</p>
-            <p>
-              {mairieInfo.billing_address.postal_code} {mairieInfo.billing_address.city}
-            </p>
-            <p className="pt-2">
-              <strong>Livraison:</strong>
-            </p>
-            <p>{mairieInfo.shipping_address.street}</p>
-            <p>
-              {mairieInfo.shipping_address.postal_code} {mairieInfo.shipping_address.city}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="card mt-6">
-        <label className="flex items-start">
-          <input
-            type="checkbox"
-            checked={acceptCgv}
-            onChange={(e) => setAcceptCgv(e.target.checked)}
-            className="mt-1 mr-3"
-          />
-          <span className="text-sm">
-            J&apos;accepte les{" "}
-            <a href="/cgv" target="_blank" className="text-primary-600 underline">
-              conditions générales de vente
-            </a>{" "}
-            et la{" "}
-            <a href="/confidentialite" target="_blank" className="text-primary-600 underline">
-              politique de confidentialité
-            </a>
-          </span>
-        </label>
-      </div>
-
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mt-4">{error}</div>}
-
-      <div className="flex justify-between mt-8">
-        <button onClick={() => setStep(2)} className="btn-secondary" disabled={loading}>
-          <ChevronLeft className="w-4 h-4 inline mr-2" />
-          Retour
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={!acceptCgv || loading}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Chargement..." : "Procéder au paiement"}
-        </button>
-      </div>
-    </div>
-  );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error ?? "Checkout failed");
+    window.location.href = data.url;
+  }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {renderStepIndicator()}
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
+    <div style={{ display: "grid", gap: 12, maxWidth: 640 }}>
+      <h2>Commande</h2>
+
+      <label>
+        Email (optionnel)
+        <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+      </label>
+
+      <label>
+        Produit
+        <select value={productKind} onChange={(e) => setProductKind(e.target.value as ProductKind)}>
+          {productKinds.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        Quantité
+        <input
+          type="number"
+          min={1}
+          value={quantity}
+          onChange={(e) => setQuantity(parseInt(e.target.value || "0", 10))}
+        />
+      </label>
+
+      {canUseImpression && (
+        <label>
+          Impression
+          <select value={impression} onChange={(e) => setImpression(e.target.value as ImpressionType)}>
+            <option value="recto">Recto</option>
+            <option value="recto_verso">Recto-verso</option>
+          </select>
+        </label>
+      )}
+
+      {productKind === "bulletins_de_vote" && (
+        <label>
+          Format liste
+          <select value={bulletinFormat} onChange={(e) => setBulletinFormat(e.target.value as BulletinFormat)}>
+            <option value="liste_5_31">5 à 31 noms</option>
+            <option value="liste_32_plus">+31 noms</option>
+          </select>
+        </label>
+      )}
+
+      {productKind === "affiches" && (
+        <label>
+          Format affiche
+          <select value={afficheFormat} onChange={(e) => setAfficheFormat(e.target.value as AfficheFormat)}>
+            <option value="grand_format">Grand format (594×841)</option>
+            <option value="petit_format">Petit format (297×420)</option>
+          </select>
+        </label>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setItems((prev) => [...prev, newItem])}
+      >
+        Ajouter au panier
+      </button>
+
+      <div style={{ border: "1px solid #ddd", padding: 12 }}>
+        <strong>Panier</strong>
+        {items.length === 0 ? (
+          <p>Aucun item</p>
+        ) : (
+          <ul>
+            {items.map((it, idx) => (
+              <li key={idx}>
+                {it.productKind} — qty {it.quantity}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <button type="button" disabled={items.length === 0} onClick={onCheckout}>
+        Payer
+      </button>
     </div>
   );
 }
