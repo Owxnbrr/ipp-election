@@ -142,7 +142,7 @@ export default function OrderForm() {
           type="number"
           min={1}
           value={quantity}
-          onChange={(e) => setQuantity(parseInt(e.target.value || "0", 10))}
+          onChange={(e) => setQuantity(parseInt(e.target.value || "", 10))}
           style={{ width: "100%" }}
         />
       </label>
