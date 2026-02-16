@@ -330,7 +330,7 @@ export default function OrderForm() {
               onClick={onPay}
               disabled={isPaying || cart.length === 0}
               className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white
-                         shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPaying ? "Redirection vers Stripe…" : "Payer"}
             </button>
@@ -344,7 +344,7 @@ export default function OrderForm() {
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
             <p className="font-semibold text-gray-900">Bon à savoir</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
-              <li>Tarification par paliers (calcul serveur)</li>
+              <li>Tarification par paliers</li>
               <li>Paiement par carte bancaire</li>
               <li>Commande enregistrée automatiquement</li>
             </ul>

@@ -108,7 +108,7 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">10. Contact</h2>
               <p className="text-gray-700">
                 Pour toute question concernant nos CGV, vous pouvez nous contacter à l&apos;adresse
-                suivante : contact@electionprint.fr ou par téléphone au 01 23 45 67 89.
+                suivante : contact@ipp-imprimerie.fr ou par téléphone au 03 22 78 01 25.
               </p>
             </section>
           </div>

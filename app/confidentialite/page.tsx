@@ -9,7 +9,7 @@ export default function ConfidentialitePage() {
             <section>
               <h2 className="text-2xl font-bold mb-4">1. Introduction</h2>
               <p className="text-gray-700">
-                ElectionPrint accorde une grande importance à la protection de vos données personnelles.
+                IPP accorde une grande importance à la protection de vos données personnelles.
                 Cette politique de confidentialité décrit comment nous collectons, utilisons et protégeons
                 vos informations dans le cadre de notre service d&apos;impression électorale.
               </p>
@@ -134,7 +134,7 @@ export default function ConfidentialitePage() {
               <ul className="list-none text-gray-700 mt-4">
                 <li>Email : contact@electionprint.fr</li>
                 <li>Téléphone : 01 23 45 67 89</li>
-                <li>Adresse : [Adresse postale]</li>
+                <li>Adresse : 6 rue Dupuy, Montdidier</li>
               </ul>
               <p className="text-gray-700 mt-4">
                 Vous pouvez également introduire une réclamation auprès de la CNIL (Commission
