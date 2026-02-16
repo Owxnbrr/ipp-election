@@ -1,9 +1,7 @@
-import { getProductsConfig } from '@/lib/pricing';
-import OrderForm from '@/components/OrderForm';
+// app/commande/page.tsx
+import OrderForm from "@/components/OrderForm";
 
-export default async function CommandePage() {
-  const productsConfig = await getProductsConfig();
-
+export default function CommandePage() {
   return (
     <div className="py-12">
       <div className="container mx-auto px-4">
@@ -14,7 +12,7 @@ export default async function CommandePage() {
           </p>
         </div>
 
-        <OrderForm productsConfig={productsConfig} />
+        <OrderForm />
       </div>
     </div>
   );
