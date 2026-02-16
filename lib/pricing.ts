@@ -24,6 +24,21 @@ export function formatCents(cents: number, locale = "fr-FR"): string {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(euros);
 }
 
+/** ✅ Config simple pour ton UI (liste produits/labels) */
+export type ProductConfig = {
+  kind: ProductKind;
+  label: string;
+  isActive: boolean;
+};
+
+export function getProductsConfig(): ProductConfig[] {
+  return [
+    { kind: "professions_de_foi", label: "Professions de foi", isActive: true },
+    { kind: "bulletins_de_vote", label: "Bulletins de vote", isActive: true },
+    { kind: "affiches", label: "Affiches", isActive: true },
+  ];
+}
+
 function roundQuantityIfNeeded(qty: number, blocks: PricingBlockRow[], productKind: ProductKind): number {
   const mode = ROUNDING_MODE_BY_PRODUCT[productKind];
   if (mode === "none") return qty;

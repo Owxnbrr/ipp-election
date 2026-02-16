@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ProductConfig } from "@/lib/pricing";
 import type { CartItem, ProductKind, ImpressionType, BulletinFormat, AfficheFormat } from "@/types";
 
 const productKinds: { value: ProductKind; label: string }[] = [
@@ -9,8 +10,11 @@ const productKinds: { value: ProductKind; label: string }[] = [
   { value: "bulletins_de_vote", label: "Bulletins de vote" },
   { value: "affiches", label: "Affiches" },
 ];
+type Props = {
+  productsConfig: ProductConfig[];
+};
 
-export default function OrderForm() {
+export default function OrderForm({ productsConfig }: Props) {
   const [productKind, setProductKind] = useState<ProductKind>("professions_de_foi");
   const [quantity, setQuantity] = useState<number>(100);
 
