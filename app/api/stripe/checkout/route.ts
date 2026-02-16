@@ -12,7 +12,7 @@ const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SE
   auth: { persistSession: false },
 });
 
-// ---- Zod schemas
+// ---- Zod schemas (strict unions)
 const professionsItemSchema = z.object({
   productKind: z.literal("professions_de_foi"),
   quantity: z.number().int().positive(),
@@ -62,8 +62,50 @@ function itemLabel(item: CartItem): string {
     const fmt = item.bulletinFormat === "liste_5_31" ? "Liste 5–31" : "Liste 32+";
     return `${productLabel(item.productKind)} - ${fmt} - ${item.impression === "recto" ? "Recto" : "Recto-verso"}`;
   }
-  const af = item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420";
+  const af =
+    item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420";
   return `${productLabel(item.productKind)} - ${af}`;
+}
+
+function safeErrorMessage(err: unknown): string {
+  if (err instanceof z.ZodError) return err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const anyErr = err as any;
+    if (typeof anyErr.message === "string") return anyErr.message;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return "Unknown error";
+    }
+  }
+  return "Unknown error";
+}
+
+function safeErrorDetails(err: unknown): Record<string, unknown> | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const anyErr = err as any;
+
+  // Stripe error often has: type, code, raw, statusCode
+  const details: Record<string, unknown> = {};
+  for (const k of ["name", "type", "code", "statusCode", "param"]) {
+    if (anyErr[k] != null) details[k] = anyErr[k];
+  }
+  if (anyErr.raw && typeof anyErr.raw === "object") {
+    details.raw = {
+      message: anyErr.raw.message,
+      type: anyErr.raw.type,
+      code: anyErr.raw.code,
+      param: anyErr.raw.param,
+      request_log_url: anyErr.raw.request_log_url,
+    };
+  }
+  // Supabase/Postgrest error often has: message, details, hint, code
+  for (const k of ["details", "hint"]) {
+    if (anyErr[k] != null) details[k] = anyErr[k];
+  }
+  return Object.keys(details).length ? details : undefined;
 }
 
 export async function POST(req: Request) {
@@ -71,6 +113,7 @@ export async function POST(req: Request) {
     const json = await req.json();
     const body = checkoutBodySchema.parse(json);
 
+    // 1) Load pricing blocks
     const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
@@ -79,8 +122,11 @@ export async function POST(req: Request) {
     if (blocksErr) throw blocksErr;
 
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
+
+    // 2) Server pricing
     const pricedOrder = priceOrder(body.items, allBlocks, 0.2);
 
+    // 3) Create order
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert({
@@ -98,41 +144,86 @@ export async function POST(req: Request) {
     if (orderErr) throw orderErr;
     const orderId = orderInsert.id as string;
 
+    // 4) Create order_items (compat old + new schema)
     const itemsRows = pricedOrder.items.map((it) => {
+      const name = itemLabel(it);
+
+      // options "legacy" (pour old schema order_items.options)
+      const options =
+        it.productKind === "professions_de_foi"
+          ? { impression: it.impression }
+          : it.productKind === "bulletins_de_vote"
+            ? { impression: it.impression, bulletinFormat: it.bulletinFormat }
+            : { afficheFormat: it.afficheFormat };
+
+      // On met aussi les champs legacy qui peuvent être NOT NULL chez toi
+      // unit_price_cents / line_total_cents = HT (comme ton pricing)
+      const legacyUnit = Math.round(it.totalHtCents / it.quantity);
+
       if (it.productKind === "professions_de_foi") {
         return {
           order_id: orderId,
+
+          // legacy
+          product_type: it.productKind,
+          product_name: name,
+          options,
+          unit_price_cents: legacyUnit,
+          line_total_cents: it.totalHtCents,
+
+          // new
           product_kind: it.productKind,
           quantity: it.quantity,
           impression: it.impression,
           bulletin_format: null,
           affiche_format: null,
-          unit_ht_cents: it.unitHtCents,
+          unit_ht_cents: Math.round(it.totalHtCents / it.quantity),
           total_ht_cents: it.totalHtCents,
           pricing_breakdown: it.breakdown,
         };
       }
+
       if (it.productKind === "bulletins_de_vote") {
         return {
           order_id: orderId,
+
+          // legacy
+          product_type: it.productKind,
+          product_name: name,
+          options,
+          unit_price_cents: legacyUnit,
+          line_total_cents: it.totalHtCents,
+
+          // new
           product_kind: it.productKind,
           quantity: it.quantity,
           impression: it.impression,
           bulletin_format: it.bulletinFormat,
           affiche_format: null,
-          unit_ht_cents: it.unitHtCents,
+          unit_ht_cents: Math.round(it.totalHtCents / it.quantity),
           total_ht_cents: it.totalHtCents,
           pricing_breakdown: it.breakdown,
         };
       }
+
+      // affiches
       return {
         order_id: orderId,
+
+        // legacy
+        product_type: it.productKind,
+        product_name: name,
+        options,
+        unit_price_cents: legacyUnit,
+        line_total_cents: it.totalHtCents,
+
+        // new
         product_kind: it.productKind,
         quantity: it.quantity,
         impression: null,
         bulletin_format: null,
         affiche_format: it.afficheFormat,
-        unit_ht_cents: it.unitHtCents,
+        unit_ht_cents: Math.round(it.totalHtCents / it.quantity),
         total_ht_cents: it.totalHtCents,
         pricing_breakdown: it.breakdown,
       };
@@ -141,6 +232,8 @@ export async function POST(req: Request) {
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
 
+    // 5) Stripe checkout (montant EXACT par item)
+    // -> 1 line per item, quantity=1, unit_amount=totalHtCents
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -152,15 +245,16 @@ export async function POST(req: Request) {
             name: itemLabel(it),
             metadata: { order_id: orderId, product_kind: it.productKind },
           },
-          unit_amount: it.unitHtCents,
+          unit_amount: it.totalHtCents,
         },
-        quantity: it.quantity,
+        quantity: 1,
       })),
       success_url: `${env.NEXT_PUBLIC_SITE_URL}/merci?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.NEXT_PUBLIC_SITE_URL}/cart?canceled=1`,
+      cancel_url: `${env.NEXT_PUBLIC_SITE_URL}/commande?canceled=1`,
       metadata: { order_id: orderId },
     });
 
+    // 6) Save stripe session id
     const { error: updErr } = await supabaseAdmin
       .from("orders")
       .update({ stripe_session_id: session.id })
@@ -169,10 +263,10 @@ export async function POST(req: Request) {
     if (updErr) throw updErr;
 
     return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err) {
-  console.error("CHECKOUT_ERROR:", err);
-  const message = err instanceof Error ? err.message : "Unknown error";
-  return NextResponse.json({ error: message }, { status: 400 });
-}
-
+  } catch (err: unknown) {
+    console.error("CHECKOUT_ERROR RAW:", err);
+    const message = safeErrorMessage(err);
+    const details = safeErrorDetails(err);
+    return NextResponse.json({ error: message, details }, { status: 400 });
+  }
 }
