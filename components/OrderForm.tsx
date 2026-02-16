@@ -154,7 +154,7 @@ export default function OrderForm() {
           <div className="mt-6 space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email (optionnel)</label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
                            focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
