@@ -6,7 +6,7 @@ import Link from 'next/link';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ElectionPrint - Impression électorale pour mairies',
+  title: 'IPP - Impression électorale pour mairies',
   description: 'Commandez vos affiches, bulletins et professions de foi électorales en ligne',
 };
 
