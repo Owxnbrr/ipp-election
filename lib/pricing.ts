@@ -55,10 +55,16 @@ function labelForBlock(productKind: ProductKind, seq: number, blockSize: number)
   return `Palier ${seq} (bloc ${blockSize})`;
 }
 
-function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): PricingBlockRow[] {
+function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[], originalQty: number): PricingBlockRow[] {
   const base = allBlocks.filter((b) => b.product_kind === item.productKind && b.is_active);
 
   const filtered = base.filter((b) => {
+    // filtre tranche
+    const minOk = originalQty >= (b.range_min ?? 1);
+    const maxOk = b.range_max == null ? true : originalQty <= b.range_max;
+    if (!minOk || !maxOk) return false;
+
+    // filtre options
     if (item.productKind === "professions_de_foi") {
       return b.impression === item.impression && b.bulletin_format === null && b.affiche_format === null;
     }
@@ -74,6 +80,7 @@ function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): Prici
 
   return filtered.sort((a, b) => a.seq - b.seq);
 }
+
 
 function applyBlocksPricing(
   productKind: ProductKind,
@@ -123,7 +130,7 @@ function applyBlocksPricing(
 }
 
 export function priceCartItem(item: CartItem, allBlocks: PricingBlockRow[]): PricedItem {
-  const blocks = matchBlocksForItem(item, allBlocks);
+  const blocks = matchBlocksForItem(item, allBlocks, item.quantity);
   const { pricedQty, totalCents, breakdown } = applyBlocksPricing(item.productKind, item.quantity, blocks);
 
   const unit = Math.round(totalCents / pricedQty);

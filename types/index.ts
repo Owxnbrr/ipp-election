@@ -63,4 +63,8 @@ export type PricingBlockRow = {
   block_price_cents: MoneyCents;
   max_applications: number | null;
   is_active: boolean;
+
+  range_min: number;        // NEW
+  range_max: number | null; // NEW
 };
+
