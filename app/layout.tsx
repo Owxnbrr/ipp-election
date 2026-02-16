@@ -24,7 +24,7 @@ export default function RootLayout({
             <div className="container mx-auto px-4 py-4">
               <nav className="flex items-center justify-between">
                 <Link href="/" className="text-2xl font-bold text-primary-600">
-                  IPP Print
+                  IPP
                 </Link>
                 <div className="flex items-center gap-6">
                   <Link 
@@ -60,7 +60,7 @@ export default function RootLayout({
             <div className="container mx-auto px-4">
               <div className="grid md:grid-cols-3 gap-8">
                 <div>
-                  <h3 className="text-white font-bold mb-4">ElectionPrint</h3>
+                  <h3 className="text-white font-bold mb-4">IPP</h3>
                   <p className="text-sm">
                     Votre partenaire pour l&apos;impression de documents électoraux.
                     Service dédié aux mairies françaises.
@@ -84,13 +84,13 @@ export default function RootLayout({
                 <div>
                   <h4 className="text-white font-semibold mb-4">Contact</h4>
                   <p className="text-sm">
-                    Email: contact@electionprint.fr<br />
-                    Tél: 01 23 45 67 89
+                    Email: contact@ipp-imprimerie.fr<br />
+                    Tél: 03 22 78 01 25
                   </p>
                 </div>
               </div>
               <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
-                <p>&copy; {new Date().getFullYear()} ElectionPrint. Tous droits réservés.</p>
+                <p>&copy; {new Date().getFullYear()} IPP. Tous droits réservés.</p>
               </div>
             </div>
           </footer>
