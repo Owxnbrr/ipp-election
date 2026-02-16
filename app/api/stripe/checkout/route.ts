@@ -170,7 +170,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  console.error("CHECKOUT_ERROR:", err);
+  const message = err instanceof Error ? err.message : "Unknown error";
+  return NextResponse.json({ error: message }, { status: 400 });
+}
+
 }

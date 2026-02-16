@@ -74,18 +74,22 @@ export default function OrderForm() {
     setLoading(true);
     try {
       const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerEmail: customerEmail || undefined,
-          items,
-        }),
-      });
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerEmail: customerEmail || undefined,
+        items,
+      }),
+    });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Checkout failed");
+    const data = await res.json().catch(() => null);
 
-      window.location.href = data.url;
+    if (!res.ok) {
+      throw new Error(data?.error ?? `HTTP ${res.status}`);
+    }
+
+    window.location.href = data.url;
+
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
