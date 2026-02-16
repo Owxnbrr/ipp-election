@@ -68,7 +68,9 @@ function itemLabel(item: CartItem): string {
 }
 
 function safeErrorMessage(err: unknown): string {
-  if (err instanceof z.ZodError) return err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
+  if (err instanceof z.ZodError) {
+    return err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
+  }
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
   if (err && typeof err === "object") {
@@ -87,11 +89,11 @@ function safeErrorDetails(err: unknown): Record<string, unknown> | undefined {
   if (!err || typeof err !== "object") return undefined;
   const anyErr = err as any;
 
-  // Stripe error often has: type, code, raw, statusCode
   const details: Record<string, unknown> = {};
-  for (const k of ["name", "type", "code", "statusCode", "param"]) {
+  for (const k of ["name", "type", "code", "statusCode", "param", "details", "hint"]) {
     if (anyErr[k] != null) details[k] = anyErr[k];
   }
+
   if (anyErr.raw && typeof anyErr.raw === "object") {
     details.raw = {
       message: anyErr.raw.message,
@@ -101,10 +103,7 @@ function safeErrorDetails(err: unknown): Record<string, unknown> | undefined {
       request_log_url: anyErr.raw.request_log_url,
     };
   }
-  // Supabase/Postgrest error often has: message, details, hint, code
-  for (const k of ["details", "hint"]) {
-    if (anyErr[k] != null) details[k] = anyErr[k];
-  }
+
   return Object.keys(details).length ? details : undefined;
 }
 
@@ -127,16 +126,23 @@ export async function POST(req: Request) {
     const pricedOrder = priceOrder(body.items, allBlocks, 0.2);
 
     // 3) Create order
+    // IMPORTANT: ton schéma a total_ht_cents NOT NULL + tva_rate
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert({
         status: "pending",
         currency: "eur",
         customer_email: body.customerEmail ?? null,
+
+        // ✅ compat schéma actuel
+        total_ht_cents: pricedOrder.subtotalHtCents,
+        tva_rate: pricedOrder.vatRate,
+        total_ttc_cents: pricedOrder.totalTtcCents,
+
+        // ✅ colonnes "nouveau schéma" si elles existent chez toi (ok si nullable)
         subtotal_ht_cents: pricedOrder.subtotalHtCents,
         vat_rate: pricedOrder.vatRate,
         vat_cents: pricedOrder.vatCents,
-        total_ttc_cents: pricedOrder.totalTtcCents,
       })
       .select("id")
       .single();
@@ -144,11 +150,10 @@ export async function POST(req: Request) {
     if (orderErr) throw orderErr;
     const orderId = orderInsert.id as string;
 
-    // 4) Create order_items (compat old + new schema)
+    // 4) Create order_items (compat legacy + new)
     const itemsRows = pricedOrder.items.map((it) => {
       const name = itemLabel(it);
 
-      // options "legacy" (pour old schema order_items.options)
       const options =
         it.productKind === "professions_de_foi"
           ? { impression: it.impression }
@@ -156,8 +161,7 @@ export async function POST(req: Request) {
             ? { impression: it.impression, bulletinFormat: it.bulletinFormat }
             : { afficheFormat: it.afficheFormat };
 
-      // On met aussi les champs legacy qui peuvent être NOT NULL chez toi
-      // unit_price_cents / line_total_cents = HT (comme ton pricing)
+      // legacy unit
       const legacyUnit = Math.round(it.totalHtCents / it.quantity);
 
       if (it.productKind === "professions_de_foi") {
@@ -177,7 +181,7 @@ export async function POST(req: Request) {
           impression: it.impression,
           bulletin_format: null,
           affiche_format: null,
-          unit_ht_cents: Math.round(it.totalHtCents / it.quantity),
+          unit_ht_cents: legacyUnit,
           total_ht_cents: it.totalHtCents,
           pricing_breakdown: it.breakdown,
         };
@@ -200,7 +204,7 @@ export async function POST(req: Request) {
           impression: it.impression,
           bulletin_format: it.bulletinFormat,
           affiche_format: null,
-          unit_ht_cents: Math.round(it.totalHtCents / it.quantity),
+          unit_ht_cents: legacyUnit,
           total_ht_cents: it.totalHtCents,
           pricing_breakdown: it.breakdown,
         };
@@ -223,7 +227,7 @@ export async function POST(req: Request) {
         impression: null,
         bulletin_format: null,
         affiche_format: it.afficheFormat,
-        unit_ht_cents: Math.round(it.totalHtCents / it.quantity),
+        unit_ht_cents: legacyUnit,
         total_ht_cents: it.totalHtCents,
         pricing_breakdown: it.breakdown,
       };
@@ -232,8 +236,7 @@ export async function POST(req: Request) {
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
 
-    // 5) Stripe checkout (montant EXACT par item)
-    // -> 1 line per item, quantity=1, unit_amount=totalHtCents
+    // 5) Stripe checkout (montant exact : 1 ligne / item)
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -245,7 +248,7 @@ export async function POST(req: Request) {
             name: itemLabel(it),
             metadata: { order_id: orderId, product_kind: it.productKind },
           },
-          unit_amount: it.totalHtCents,
+          unit_amount: it.totalHtCents, // ✅ total exact HT
         },
         quantity: 1,
       })),
