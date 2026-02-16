@@ -110,7 +110,7 @@ export default function OrderForm() {
       )}
 
       <label>
-        Email (optionnel)
+        Email
         <input
           value={customerEmail}
           onChange={(e) => setCustomerEmail(e.target.value)}
