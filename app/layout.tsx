@@ -54,7 +54,7 @@ export default function RootLayout({
           {/* Main content */}
           <main className="flex-1">
             {children}
-                    <CookieBanner />
+              <CookieBanner />
           </main>
 
           {/* Footer */}
