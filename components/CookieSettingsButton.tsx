@@ -16,16 +16,9 @@ function readConsent(): Consent | null {
 
 export default function CookieSettingsButton() {
   const openPrefs = () => {
-    // Astuce : on supprime le consent pour forcer l’ouverture au prochain render
-    // (simple et efficace, tu peux faire mieux si tu veux un modal global)
     window.localStorage.removeItem(STORAGE_KEY);
     window.location.reload();
   };
-
-  // Si tu veux n’afficher le bouton que si un consent existe :
-  // const hasConsent = typeof window !== "undefined" && !!readConsent();
-  // if (!hasConsent) return null;
-
   return (
     <button
       type="button"
