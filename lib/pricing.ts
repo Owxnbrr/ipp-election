@@ -13,6 +13,10 @@ type RoundingMode = "none" | "ceil_to_block";
 
 const DEFAULT_VAT_RATE = 0.2;
 
+/**
+ * Ici on arrondit uniquement les produits qui doivent être commandés par blocs.
+ * (tu peux ajuster si besoin)
+ */
 const ROUNDING_MODE_BY_PRODUCT: Record<ProductKind, RoundingMode> = {
   professions_de_foi: "ceil_to_block",
   bulletins_de_vote: "ceil_to_block",
@@ -22,21 +26,6 @@ const ROUNDING_MODE_BY_PRODUCT: Record<ProductKind, RoundingMode> = {
 export function formatCents(cents: number, locale = "fr-FR"): string {
   const euros = cents / 100;
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(euros);
-}
-
-/** ✅ Config simple pour ton UI (liste produits/labels) */
-export type ProductConfig = {
-  kind: ProductKind;
-  label: string;
-  isActive: boolean;
-};
-
-export function getProductsConfig(): ProductConfig[] {
-  return [
-    { kind: "professions_de_foi", label: "Professions de foi", isActive: true },
-    { kind: "bulletins_de_vote", label: "Bulletins de vote", isActive: true },
-    { kind: "affiches", label: "Affiches", isActive: true },
-  ];
 }
 
 function roundQuantityIfNeeded(qty: number, blocks: PricingBlockRow[], productKind: ProductKind): number {
@@ -55,16 +44,10 @@ function labelForBlock(productKind: ProductKind, seq: number, blockSize: number)
   return `Palier ${seq} (bloc ${blockSize})`;
 }
 
-function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[], originalQty: number): PricingBlockRow[] {
+function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): PricingBlockRow[] {
   const base = allBlocks.filter((b) => b.product_kind === item.productKind && b.is_active);
 
   const filtered = base.filter((b) => {
-    // filtre tranche
-    const minOk = originalQty >= (b.range_min ?? 1);
-    const maxOk = b.range_max == null ? true : originalQty <= b.range_max;
-    if (!minOk || !maxOk) return false;
-
-    // filtre options
     if (item.productKind === "professions_de_foi") {
       return b.impression === item.impression && b.bulletin_format === null && b.affiche_format === null;
     }
@@ -81,7 +64,20 @@ function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[], origin
   return filtered.sort((a, b) => a.seq - b.seq);
 }
 
-
+/**
+ * ✅ VERSION “TABLEAU EXACT”
+ *
+ * On considère les lignes "Les X premiers" (max_applications = 1) comme des PRIX CUMULÉS.
+ * Exemple:
+ * - 10 000 premiers = prix total HT pour 10 000
+ * - 30 000 premiers = prix total HT pour 30 000
+ *
+ * Donc :
+ * 1) On prend le plus grand palier cumulé <= qty (base)
+ * 2) On ajoute ensuite uniquement les lignes incrémentales ("mille suivant", "centaine suivante")
+ *    qui viennent APRÈS ce palier.
+ * 3) On IGNORE les autres paliers cumulés intermédiaires (sinon double comptage).
+ */
 function applyBlocksPricing(
   productKind: ProductKind,
   originalQty: number,
@@ -93,20 +89,62 @@ function applyBlocksPricing(
 
   const qty = roundQuantityIfNeeded(originalQty, blocks, productKind);
 
-  let remaining = qty;
+  // 1) paliers cumulés = max_applications === 1
+  const cumulative = blocks
+    .filter((b) => (b.max_applications ?? null) === 1)
+    .sort((a, b) => a.block_size - b.block_size);
+
+  // Trouve le palier cumulé le plus grand <= qty
+  let base: PricingBlockRow | null = null;
+  for (const c of cumulative) {
+    if (c.block_size <= qty) base = c;
+  }
+
+  let covered = 0;
   let total = 0;
   const breakdown: PricingBreakdownRow[] = [];
 
-  for (const b of blocks) {
+  let startIndex = 0;
+
+  if (base) {
+    covered = base.block_size;
+    total = base.block_price_cents;
+
+    breakdown.push({
+      seq: base.seq,
+      label: labelForBlock(productKind, base.seq, base.block_size),
+      blockSize: base.block_size,
+      applications: 1,
+      unitsCovered: base.block_size,
+      blockPriceCents: base.block_price_cents,
+      lineTotalCents: base.block_price_cents,
+    });
+
+    // point de départ après le palier base dans l'ordre seq
+    startIndex = Math.max(0, blocks.findIndex((b) => b.id === base!.id) + 1);
+  }
+
+  // 2) On complète le reste uniquement avec les paliers INCRÉMENTAUX
+  //    => on ignore max_applications === 1 (paliers cumulés) pour éviter double comptage
+  let remaining = qty - covered;
+
+  for (let i = startIndex; i < blocks.length; i++) {
     if (remaining <= 0) break;
 
+    const b = blocks[i];
+
+    // ignore tous les paliers cumulés (checkpoints)
+    if ((b.max_applications ?? null) === 1) continue;
+
     const maxApps = b.max_applications ?? Number.POSITIVE_INFINITY;
+
     const neededApps = Math.ceil(remaining / b.block_size);
     const applications = Math.min(neededApps, maxApps);
     if (applications <= 0) continue;
 
     const unitsCovered = Math.min(remaining, applications * b.block_size);
     const lineTotal = applications * b.block_price_cents;
+
     total += lineTotal;
 
     breakdown.push({
@@ -130,7 +168,7 @@ function applyBlocksPricing(
 }
 
 export function priceCartItem(item: CartItem, allBlocks: PricingBlockRow[]): PricedItem {
-  const blocks = matchBlocksForItem(item, allBlocks, item.quantity);
+  const blocks = matchBlocksForItem(item, allBlocks);
   const { pricedQty, totalCents, breakdown } = applyBlocksPricing(item.productKind, item.quantity, blocks);
 
   const unit = Math.round(totalCents / pricedQty);
