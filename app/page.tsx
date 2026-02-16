@@ -23,10 +23,8 @@ export default function HomePage() {
       {/* Products Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            Nos produits électoraux
-          </h2>
-          
+          <h2 className="text-3xl font-bold text-center mb-12">Nos produits électoraux</h2>
+
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Affiches */}
             <div className="card hover:shadow-lg transition-shadow">
@@ -35,13 +33,13 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-bold mb-3">Affiches électorales</h3>
               <p className="text-gray-600 mb-4">
-                Formats A3, A2, A1. Couleur ou N&B. Papier standard ou premium.
-                Finition pelliculage disponible.
+                Formats réglementaires pour l’affichage : <strong>Petit format (297×420)</strong> ou{" "}
+                <strong>Grand format (594×841)</strong>. Impression soignée, prête à poser.
               </p>
               <ul className="text-sm text-gray-600 space-y-2">
-                <li>✓ Formats variés</li>
-                <li>✓ Haute qualité d&apos;impression</li>
-                <li>✓ Finition professionnelle</li>
+                <li>✓ Petit / Grand format</li>
+                <li>✓ Impression nette et durable</li>
+                <li>✓ Tarifs à l’unité + paliers</li>
               </ul>
             </div>
 
@@ -52,13 +50,13 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-bold mb-3">Bulletins de vote</h3>
               <p className="text-gray-600 mb-4">
-                Formats A6 ou A5. Conformes aux normes électorales.
-                Papier standard ou épais.
+                Bulletins conformes, selon votre liste : <strong>5–31</strong> ou <strong>32+</strong>,
+                en <strong>recto</strong> ou <strong>recto-verso</strong>. Quantités par paliers.
               </p>
               <ul className="text-sm text-gray-600 space-y-2">
-                <li>✓ Conformes aux normes</li>
-                <li>✓ Papier de qualité</li>
-                <li>✓ Production rapide</li>
+                <li>✓ Listes 5–31 / 32+</li>
+                <li>✓ Recto ou recto-verso</li>
+                <li>✓ Calcul automatique du prix</li>
               </ul>
             </div>
 
@@ -69,18 +67,19 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-bold mb-3">Professions de foi</h3>
               <p className="text-gray-600 mb-4">
-                Formats A4 ou A5. Couleur ou N&B. Option pliage disponible.
-                Papier premium.
+                Impression de professions de foi en <strong>recto</strong> ou <strong>recto-verso</strong>.
+                Quantités gérées par <strong>blocs</strong> pour respecter la grille tarifaire.
               </p>
               <ul className="text-sm text-gray-600 space-y-2">
-                <li>✓ Formats adaptés</li>
-                <li>✓ Pliage professionnel</li>
-                <li>✓ Rendu soigné</li>
+                <li>✓ Recto / Recto-verso</li>
+                <li>✓ Paliers par blocs</li>
+                <li>✓ Rendu propre et lisible</li>
               </ul>
             </div>
           </div>
         </div>
       </section>
+
 
       {/* How it works */}
       <section className="py-20 bg-gray-100">
