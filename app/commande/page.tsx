@@ -3,14 +3,14 @@ import OrderForm from "@/components/OrderForm";
 
 export default function CommandePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-10 sm:py-14">
       <div className="container mx-auto px-4">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-6xl">
           {/* Header */}
-          <div className="text-center mb-10">
-            <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
+          <div className="mb-10 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-green-500" />
-              Commande en ligne
+              Paiement sécurisé par Stripe
             </span>
 
             <h1 className="mt-5 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
@@ -18,66 +18,54 @@ export default function CommandePage() {
             </h1>
 
             <p className="mt-3 text-gray-600">
-              Suivez les étapes pour configurer votre commande de documents électoraux.
+              Configurez vos documents électoraux, vérifiez le panier puis payez en carte bancaire.
             </p>
           </div>
 
-          {/* Steps */}
-          <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-900 text-white text-sm font-semibold">
-                  1
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">Configurer</p>
-                  <p className="text-sm text-gray-600">Produit, options, quantité</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-900 text-white text-sm font-semibold">
-                  2
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">Panier</p>
-                  <p className="text-sm text-gray-600">Vérifier les articles</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-900 text-white text-sm font-semibold">
-                  3
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">Paiement</p>
-                  <p className="text-sm text-gray-600">Carte bancaire sécurisée</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Card */}
+          {/* Main card */}
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-100 p-6 sm:p-8">
-              <h2 className="text-lg font-semibold text-gray-900">Détails de la commande</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Remplissez les informations ci-dessous, puis ajoutez au panier.
-              </p>
+            <div className="border-b border-gray-100 px-6 py-5 sm:px-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Votre commande</h2>
+                  <p className="text-sm text-gray-600">
+                    Ajoutez vos articles au panier, puis lancez le paiement.
+                  </p>
+                </div>
+
+                {/* Steps */}
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white">
+                      1
+                    </span>
+                    Configurer
+                  </div>
+                  <div className="hidden sm:block text-gray-300">—</div>
+                  <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white">
+                      2
+                    </span>
+                    Panier
+                  </div>
+                  <div className="hidden sm:block text-gray-300">—</div>
+                  <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white">
+                      3
+                    </span>
+                    Paiement
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="p-6 sm:p-8">
+            <div className="px-6 py-6 sm:px-8 sm:py-8">
               <OrderForm />
             </div>
           </div>
 
-          {/* Footer note */}
           <p className="mt-6 text-center text-xs text-gray-500">
-            Paiement traité par Stripe. Vos informations de carte ne sont jamais stockées.
+            Vos informations de carte ne sont jamais stockées sur notre site.
           </p>
         </div>
       </div>
