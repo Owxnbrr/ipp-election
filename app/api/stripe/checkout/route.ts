@@ -97,14 +97,13 @@ export async function POST(req: Request) {
     if (blocksErr) throw blocksErr;
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
-    // 2) Pricing serveur (HT + TVA + TTC)
+    // 2) Pricing serveur (HT + TVA + TTC) -> ✅ camelCase uniquement
     const priced = priceOrder(body.items as CartItem[], allBlocks);
 
-    // On supporte plusieurs formes de retour (selon ton pricing.ts)
-    const pricedItems: any[] = priced?.items ?? [];
-    const subtotalHtCents = safeInt(priced?.subtotalHtCents ?? priced?.subtotal_ht_cents ?? priced?.totalHtCents, 0);
-    const vatCents = safeInt(priced?.vatCents ?? priced?.vat_cents, 0);
-    const totalTtcCents = safeInt(priced?.totalTtcCents ?? priced?.total_ttc_cents, subtotalHtCents + vatCents);
+    const pricedItems = priced.items ?? [];
+    const subtotalHtCents = safeInt(priced.subtotalHtCents, 0);
+    const vatCents = safeInt(priced.vatCents, 0);
+    const totalTtcCents = safeInt(priced.totalTtcCents, subtotalHtCents + vatCents);
 
     // Sécurité : jamais 0 si panier non vide (évite null / NaN)
     if (!pricedItems.length || totalTtcCents <= 0) {
@@ -126,8 +125,7 @@ export async function POST(req: Request) {
       subtotal_ht_cents: subtotalHtCents,
       vat_cents: vatCents,
 
-      // champs "rate" au niveau order: si tu as mix TVA, on met null/0 (mais surtout pas undefined)
-      // (si ta colonne est NOT NULL, mets 0)
+      // champs "rate" au niveau order: si tu as mix TVA, on met 0 (évite undefined)
       vat_rate: 0,
       tva_rate: 0,
 
@@ -145,23 +143,23 @@ export async function POST(req: Request) {
 
     // 4) Insert order_items avec tous les champs sensibles NOT NULL
     const itemsRows = (body.items as CartItem[]).map((it, idx) => {
-      const p = pricedItems[idx] ?? {};
+      const p = pricedItems[idx];
 
-      const itemHt = safeInt(p.totalHtCents ?? p.total_ht_cents ?? p.htCents, 0);
-      const itemVat = safeInt(p.vatCents ?? p.vat_cents, 0);
-      const itemTtc = safeInt(p.totalTtcCents ?? p.total_ttc_cents ?? p.ttcCents, itemHt + itemVat);
+      const itemHt = safeInt(p?.totalHtCents, 0);
+      const itemVat = safeInt(p?.vatCents, 0);
+      const itemTtc = safeInt(p?.totalTtcCents, itemHt + itemVat);
 
       // TVA rate par item (si dispo)
-      const vatRate = typeof p.vatRate === "number" ? p.vatRate : typeof p.vat_rate === "number" ? p.vat_rate : null;
+      const vatRate = typeof p?.vatRate === "number" ? p.vatRate : null;
 
       return {
         order_id: orderId,
 
         // ✅ NOT NULL chez toi
-        product_type: it.productKind,               // ex: "professions_de_foi"
-        quantity: it.quantity,                      // int
-        unit_price_cents: itemTtc,                  // on stocke le TTC comme "prix unitaire" de la ligne
-        line_total_cents: itemTtc,                  // idem (si tu charges la ligne en 1 seul bloc)
+        product_type: it.productKind, // ex: "professions_de_foi"
+        quantity: it.quantity, // int
+        unit_price_cents: itemTtc, // on stocke le TTC comme "prix unitaire" de la ligne
+        line_total_cents: itemTtc, // idem (si tu charges la ligne en 1 seul bloc)
 
         // Champs détaillés (tu les as dans ta table)
         product_kind: it.productKind,
@@ -178,7 +176,8 @@ export async function POST(req: Request) {
         total_ttc_cents: itemTtc,
         vat_rate: vatRate,
 
-        pricing_breakdown: p.pricingBreakdown ?? p.pricing_breakdown ?? null,
+        // ✅ ton pricing.ts renvoie "breakdown"
+        pricing_breakdown: p?.breakdown ?? null,
       };
     });
 
@@ -186,32 +185,33 @@ export async function POST(req: Request) {
     if (itemsErr) throw itemsErr;
 
     // 5) Stripe line_items : on charge chaque item TTC (quantité = 1)
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = (body.items as CartItem[]).map(
-      (it, idx) => {
-        const p = pricedItems[idx] ?? {};
-        const itemHt = safeInt(p.totalHtCents ?? p.total_ht_cents, 0);
-        const itemVat = safeInt(p.vatCents ?? p.vat_cents, 0);
-        const itemTtc = safeInt(p.totalTtcCents ?? p.total_ttc_cents, itemHt + itemVat);
-        const vatRate =
-          typeof p.vatRate === "number" ? p.vatRate : typeof p.vat_rate === "number" ? p.vat_rate : null;
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = (body.items as CartItem[]).map((it, idx) => {
+      const p = pricedItems[idx];
 
-        const label = labelItem(it);
+      const itemHt = safeInt(p?.totalHtCents, 0);
+      const itemVat = safeInt(p?.vatCents, 0);
+      const itemTtc = safeInt(p?.totalTtcCents, itemHt + itemVat);
 
-        return {
-          quantity: 1,
-          price_data: {
-            currency: "eur",
-            unit_amount: itemTtc, // ✅ TTC (avec TVA)
-            product_data: {
-              name: label,
-              description: `Quantité: ${it.quantity} • HT: ${(itemHt / 100).toFixed(2)}€ • TVA: ${(itemVat / 100).toFixed(
-                2
-              )}€${vatRate != null ? ` (${(vatRate * 100).toFixed(1).replace(".", ",")}%)` : ""}`,
-            },
+      const vatRate = typeof p?.vatRate === "number" ? p.vatRate : null;
+
+      const label = labelItem(it);
+
+      return {
+        quantity: 1,
+        price_data: {
+          currency: "eur",
+          unit_amount: itemTtc, // ✅ TTC (avec TVA)
+          product_data: {
+            name: label,
+            description: `Quantité: ${it.quantity} • HT: ${(itemHt / 100).toFixed(
+              2
+            )}€ • TVA: ${(itemVat / 100).toFixed(2)}€${
+              vatRate != null ? ` (${(vatRate * 100).toFixed(1).replace(".", ",")}%)` : ""
+            }`,
           },
-        };
-      }
-    );
+        },
+      };
+    });
 
     // 6) Crée la session Stripe
     const session = await stripe.checkout.sessions.create({

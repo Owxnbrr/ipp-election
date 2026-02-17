@@ -108,7 +108,10 @@ function applyBlocksPricing(
   return { pricedQty: qty, totalCents: total, breakdown };
 }
 
-export function priceCartItem(item: CartItem, allBlocks: PricingBlockRow[]): PricedItem & {
+export function priceCartItem(
+  item: CartItem,
+  allBlocks: PricingBlockRow[]
+): PricedItem & {
   vatRate: number;
   vatCents: number;
   totalTtcCents: number;
@@ -134,7 +137,10 @@ export function priceCartItem(item: CartItem, allBlocks: PricingBlockRow[]): Pri
   };
 }
 
-export function priceOrder(items: CartItem[], allBlocks: PricingBlockRow[]): PricedOrder & {
+export function priceOrder(
+  items: CartItem[],
+  allBlocks: PricingBlockRow[]
+): PricedOrder & {
   subtotalHtCents: number;
   vatCents: number;
   totalTtcCents: number;
