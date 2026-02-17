@@ -1,4 +1,3 @@
-// components/OrderForm.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -34,9 +33,7 @@ function labelItem(item: CartItem): string {
     const fmt = item.bulletinFormat === "liste_5_31" ? "Liste 5–31" : "Liste 32+";
     return `Bulletins de vote • ${fmt} • ${item.impression === "recto" ? "Recto" : "Recto-verso"}`;
   }
-  return `Affiches • ${
-    item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420"
-  }`;
+  return `Affiches • ${item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420"}`;
 }
 
 function buildCartItem(form: FormState, qty: number): CartItem {
@@ -54,15 +51,6 @@ function buildCartItem(form: FormState, qty: number): CartItem {
   return { productKind: "affiches", quantity: qty, afficheFormat: form.afficheFormat };
 }
 
-/**
- * Réponse attendue de /api/pricing/quote :
- * {
- *   items: [{ totalHtCents, vatCents, totalTtcCents, vatRate, quantity? ... }],
- *   subtotalHtCents,
- *   vatCents,
- *   totalTtcCents
- * }
- */
 type Quote = any;
 
 export default function OrderForm() {
@@ -78,7 +66,10 @@ export default function OrderForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
 
-  // ✅ Quote serveur (prix exact avant paiement)
+  // ✅ fichiers
+  const [files, setFiles] = useState<File[]>([]);
+
+  // ✅ Quote serveur
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -93,7 +84,6 @@ export default function OrderForm() {
     return Number.isFinite(n) && n > 0;
   }, [quantity]);
 
-  // ✅ Recalcule le prix exact à chaque changement de panier (propre)
   useEffect(() => {
     let cancelled = false;
 
@@ -150,11 +140,33 @@ export default function OrderForm() {
 
     const item = buildCartItem(form, qty);
     setCart((prev) => [...prev, item]);
-    setQuantity(""); // ✅ reset sans 0
+    setQuantity("");
   }
 
   function removeItem(index: number) {
     setCart((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function onFilesPicked(list: FileList | null) {
+    if (!list) return;
+    const picked = Array.from(list);
+
+    // filtre simple (tu peux élargir)
+    const allowed = picked.filter((f) => {
+      const t = (f.type || "").toLowerCase();
+      return (
+        t.includes("pdf") ||
+        t.startsWith("image/") ||
+        t.includes("zip") ||
+        t.includes("octet-stream") // certains navigateurs
+      );
+    });
+
+    setFiles((prev) => [...prev, ...allowed]);
+  }
+
+  function removeFile(idx: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function onPay() {
@@ -165,9 +177,21 @@ export default function OrderForm() {
       return;
     }
 
+    // 🔒 Recommandé : exiger au moins 1 fichier
+    if (files.length === 0) {
+      setError("Ajoutez au moins un fichier (PDF / image) avant de payer.");
+      return;
+    }
+
+    if (quoteLoading || quoteError) {
+      setError("Le prix n'est pas disponible. Vérifiez le calcul du panier.");
+      return;
+    }
+
     setIsPaying(true);
     try {
-      const res = await fetch("/api/stripe/checkout", {
+      // 1) Crée une commande draft (pending) -> orderId
+      const draftRes = await fetch("/api/orders/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -176,18 +200,52 @@ export default function OrderForm() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error ?? "Erreur lors de la création du paiement.");
+      const draftData = await draftRes.json();
+      if (!draftRes.ok) {
+        setError(draftData?.error ?? "Erreur lors de la création de la commande.");
         return;
       }
 
-      if (!data?.url) {
+      const orderId = draftData?.orderId as string | undefined;
+      if (!orderId) {
+        setError("orderId manquant.");
+        return;
+      }
+
+      // 2) Upload fichiers -> /api/orders/{orderId}/files
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+
+      const upRes = await fetch(`/api/orders/${orderId}/files`, {
+        method: "POST",
+        body: fd,
+      });
+
+      const upData = await upRes.json();
+      if (!upRes.ok) {
+        setError(upData?.error ?? "Erreur upload fichiers.");
+        return;
+      }
+
+      // 3) Lancer Stripe Checkout avec l'orderId existant
+      const payRes = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const payData = await payRes.json();
+      if (!payRes.ok) {
+        setError(payData?.error ?? "Erreur lors de la création du paiement.");
+        return;
+      }
+
+      if (!payData?.url) {
         setError("URL de paiement manquante.");
         return;
       }
 
-      window.location.href = data.url as string;
+      window.location.href = payData.url as string;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur réseau.");
     } finally {
@@ -195,7 +253,6 @@ export default function OrderForm() {
     }
   }
 
-  // Helpers affichage quote
   const quoteItems: any[] = quote?.items ?? [];
   const quoteSubtotalHt = quote?.subtotalHtCents ?? null;
   const quoteVat = quote?.vatCents ?? null;
@@ -203,7 +260,6 @@ export default function OrderForm() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      {/* LEFT: Form */}
       <div className="lg:col-span-7">
         {error && (
           <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -216,7 +272,6 @@ export default function OrderForm() {
           <p className="mt-1 text-sm text-gray-600">Choisissez un produit, ses options et la quantité.</p>
 
           <div className="mt-6 space-y-5">
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
@@ -226,6 +281,54 @@ export default function OrderForm() {
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
               />
+            </div>
+
+            {/* ✅ Upload */}
+            <div className="rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Vos fichiers (PDF / images)</p>
+                  <p className="text-xs text-gray-500">Ils seront associés à la commande et accessibles 30 jours.</p>
+                </div>
+
+                <label className="inline-flex cursor-pointer items-center rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-gray-800">
+                  Ajouter
+                  <input
+                    type="file"
+                    className="hidden"
+                    multiple
+                    accept="application/pdf,image/*,.zip"
+                    onChange={(e) => {
+                      onFilesPicked(e.target.files);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              {files.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-gray-200 p-3 text-sm text-gray-600">
+                  Aucun fichier ajouté.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {files.map((f, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-xl border border-gray-200 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-gray-900">{f.name}</p>
+                        <p className="text-xs text-gray-500">{Math.round(f.size / 1024)} Ko</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(idx)}
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Product + Qty */}
@@ -277,7 +380,7 @@ export default function OrderForm() {
                   <select
                     className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
                                focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
-                    value={form.impression}
+                    value={(form as any).impression}
                     onChange={(e) =>
                       setForm((prev) => ({
                         ...(prev as any),
@@ -296,7 +399,7 @@ export default function OrderForm() {
                     <select
                       className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
                                  focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
-                      value={form.bulletinFormat}
+                      value={(form as any).bulletinFormat}
                       onChange={(e) =>
                         setForm((prev) => ({
                           ...(prev as any),
@@ -318,7 +421,7 @@ export default function OrderForm() {
                 <select
                   className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
                              focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
-                  value={form.afficheFormat}
+                  value={(form as any).afficheFormat}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...(prev as any),
@@ -332,7 +435,6 @@ export default function OrderForm() {
               </div>
             )}
 
-            {/* CTA Add */}
             <button
               type="button"
               onClick={onAddToCart}
@@ -342,23 +444,10 @@ export default function OrderForm() {
             >
               Ajouter au panier
             </button>
-
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
-              <div className="font-semibold text-gray-900">TVA appliquée</div>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-gray-600">
-                <li>Professions de foi : 5,5%</li>
-                <li>Bulletins de vote : 5,5%</li>
-                <li>Affiches : 20%</li>
-              </ul>
-              <p className="mt-2 text-gray-500">
-                Le prix affiché dans le panier est calculé côté serveur selon les paliers tarifaires.
-              </p>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* RIGHT: Cart */}
       <div className="lg:col-span-5">
         <div className="sticky top-6 space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
@@ -376,24 +465,18 @@ export default function OrderForm() {
                 </div>
               ) : (
                 cart.map((it, idx) => {
-                  const qi = quoteItems?.[idx]; // même index que cart
+                  const qi = quoteItems?.[idx];
                   const ht = qi?.totalHtCents ?? null;
                   const vat = qi?.vatCents ?? null;
                   const ttc = qi?.totalTtcCents ?? (ht != null && vat != null ? ht + vat : null);
                   const vatRate = qi?.vatRate ?? null;
 
-                  const originalQty = it.quantity;
-                  const billedQty = qi?.quantity ?? originalQty;
-                  const qtyChanged = billedQty !== originalQty;
-
                   return (
                     <div key={idx} className="rounded-xl border border-gray-200 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          {/* Ligne titre + prix TTC */}
                           <div className="flex items-start justify-between gap-3">
                             <p className="truncate text-sm font-semibold text-gray-900">{labelItem(it)}</p>
-
                             <div className="shrink-0 text-right">
                               <div className="text-xs text-gray-500">TTC</div>
                               <div className="text-sm font-semibold text-gray-900">
@@ -402,17 +485,8 @@ export default function OrderForm() {
                             </div>
                           </div>
 
-                          {/* Quantité */}
-                          <p className="mt-1 text-sm text-gray-600">
-                            Quantité : {originalQty}
-                            {qtyChanged ? (
-                              <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                                facturée : {billedQty}
-                              </span>
-                            ) : null}
-                          </p>
+                          <p className="mt-1 text-sm text-gray-600">Quantité : {it.quantity}</p>
 
-                          {/* Détail HT + TVA */}
                           {!quoteLoading && !quoteError && quote && ht != null && vat != null && (
                             <p className="mt-2 text-xs text-gray-500">
                               {formatCents(ht)} HT + {formatCents(vat)} TVA
@@ -420,9 +494,7 @@ export default function OrderForm() {
                             </p>
                           )}
 
-                          {!quoteLoading && quoteError && (
-                            <p className="mt-2 text-xs text-red-600">{quoteError}</p>
-                          )}
+                          {!quoteLoading && quoteError && <p className="mt-2 text-xs text-red-600">{quoteError}</p>}
                         </div>
 
                         <button
@@ -439,7 +511,6 @@ export default function OrderForm() {
               )}
             </div>
 
-            {/* TOTAL PANIER TTC AVANT PAYER */}
             {cart.length > 0 && (
               <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
                 {quoteLoading ? (
@@ -468,10 +539,6 @@ export default function OrderForm() {
                         {quoteTotalTtc != null ? formatCents(quoteTotalTtc) : "—"}
                       </span>
                     </div>
-
-                    <p className="text-xs text-gray-500">
-                      Total calculé côté serveur selon les paliers + TVA (5,5% / 20%).
-                    </p>
                   </div>
                 ) : null}
               </div>
@@ -484,20 +551,10 @@ export default function OrderForm() {
               className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white
                         shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isPaying ? "Redirection vers Stripe…" : "Payer"}
+              {isPaying ? "Préparation…" : "Payer"}
             </button>
 
             <p className="mt-3 text-xs text-gray-500">Vous serez redirigé vers Stripe pour finaliser le paiement.</p>
-          </div>
-
-          {/* Trust */}
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
-            <p className="font-semibold text-gray-900">Bon à savoir</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-600">
-              <li>Tarification par paliers</li>
-              <li>Paiement par carte bancaire</li>
-              <li>Commande enregistrée automatiquement</li>
-            </ul>
           </div>
         </div>
       </div>
