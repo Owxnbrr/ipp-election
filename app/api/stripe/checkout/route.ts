@@ -138,6 +138,7 @@ export async function POST(req: Request) {
         order_id: orderId,
         product_type: it.productKind, // ✅ IMPORTANT (NOT NULL)
         product_name: label,
+        quantity: it.quantity,
         options: {
           quantity: it.quantity,
           impression: it.productKind !== "affiches" ? it.impression : null,
