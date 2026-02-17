@@ -1,3 +1,4 @@
+// /api/pricing/quote/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";

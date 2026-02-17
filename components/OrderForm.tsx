@@ -1,3 +1,4 @@
+// components/OrderForm.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -54,8 +55,13 @@ function buildCartItem(form: FormState, qty: number): CartItem {
 }
 
 /**
- * Structure attendue depuis /api/pricing/quote
- * (on garde "any" souple pour ne pas casser si tu ajustes le serveur)
+ * Réponse attendue de /api/pricing/quote :
+ * {
+ *   items: [{ totalHtCents, vatCents, totalTtcCents, vatRate, quantity? ... }],
+ *   subtotalHtCents,
+ *   vatCents,
+ *   totalTtcCents
+ * }
  */
 type Quote = any;
 
@@ -78,10 +84,8 @@ export default function OrderForm() {
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const totals = useMemo(() => {
-    return {
-      count: cart.length,
-    };
-  }, [cart]);
+    return { count: cart.length };
+  }, [cart.length]);
 
   const canAdd = useMemo(() => {
     if (quantity === "") return false;
@@ -89,7 +93,7 @@ export default function OrderForm() {
     return Number.isFinite(n) && n > 0;
   }, [quantity]);
 
-  // ✅ Récupère le prix exact à chaque changement panier
+  // ✅ Recalcule le prix exact à chaque changement de panier (propre)
   useEffect(() => {
     let cancelled = false;
 
@@ -133,7 +137,7 @@ export default function OrderForm() {
     return () => {
       cancelled = true;
     };
-  }, [JSON.stringify(cart)]);
+  }, [cart]);
 
   async function onAddToCart() {
     setError(null);
@@ -191,7 +195,7 @@ export default function OrderForm() {
     }
   }
 
-  // Helpers affichage quote par item (même ordre que le panier)
+  // Helpers affichage quote
   const quoteItems: any[] = quote?.items ?? [];
   const quoteSubtotalHt = quote?.subtotalHtCents ?? null;
   const quoteVat = quote?.vatCents ?? null;
@@ -385,9 +389,20 @@ export default function OrderForm() {
                   return (
                     <div key={idx} className="rounded-xl border border-gray-200 p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-900">{labelItem(it)}</p>
+                        <div className="min-w-0 flex-1">
+                          {/* Ligne titre + prix TTC */}
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="truncate text-sm font-semibold text-gray-900">{labelItem(it)}</p>
 
+                            <div className="shrink-0 text-right">
+                              <div className="text-xs text-gray-500">TTC</div>
+                              <div className="text-sm font-semibold text-gray-900">
+                                {quoteLoading ? "…" : ttc != null ? formatCents(ttc) : "—"}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quantité */}
                           <p className="mt-1 text-sm text-gray-600">
                             Quantité : {originalQty}
                             {qtyChanged ? (
@@ -397,45 +412,17 @@ export default function OrderForm() {
                             ) : null}
                           </p>
 
-                          {/* ✅ PRIX AVANT PAIEMENT */}
-                          <div className="mt-2 space-y-1 text-xs text-gray-600">
-                            {quoteLoading && (
-                              <div className="text-gray-500">Calcul du prix…</div>
-                            )}
+                          {/* Détail HT + TVA */}
+                          {!quoteLoading && !quoteError && quote && ht != null && vat != null && (
+                            <p className="mt-2 text-xs text-gray-500">
+                              {formatCents(ht)} HT + {formatCents(vat)} TVA
+                              {vatRate != null ? ` (${(vatRate * 100).toFixed(1).replace(".", ",")}%)` : ""}
+                            </p>
+                          )}
 
-                            {!quoteLoading && quoteError && (
-                              <div className="text-red-600">{quoteError}</div>
-                            )}
-
-                            {!quoteLoading && !quoteError && quote && (
-                              <>
-                                {ttc != null && (
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span>Total TTC</span>
-                                    <span className="font-semibold text-gray-900">
-                                      {formatCents(ttc)}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {ht != null && vat != null && (
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span>
-                                      Détail
-                                      {vatRate != null ? (
-                                        <span className="ml-1 text-gray-500">
-                                          (TVA {(vatRate * 100).toFixed(1).replace(".", ",")}%)
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    <span className="text-gray-700">
-                                      {formatCents(ht)} HT + {formatCents(vat)} TVA
-                                    </span>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
+                          {!quoteLoading && quoteError && (
+                            <p className="mt-2 text-xs text-red-600">{quoteError}</p>
+                          )}
                         </div>
 
                         <button
@@ -452,7 +439,7 @@ export default function OrderForm() {
               )}
             </div>
 
-            {/* ✅ TOTAL PANIER AVANT PAYER */}
+            {/* TOTAL PANIER TTC AVANT PAYER */}
             {cart.length > 0 && (
               <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
                 {quoteLoading ? (
@@ -470,9 +457,7 @@ export default function OrderForm() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-gray-700">TVA</span>
-                      <span className="font-medium text-gray-900">
-                        {quoteVat != null ? formatCents(quoteVat) : "—"}
-                      </span>
+                      <span className="font-medium text-gray-900">{quoteVat != null ? formatCents(quoteVat) : "—"}</span>
                     </div>
 
                     <div className="h-px w-full bg-gray-200" />
@@ -502,9 +487,7 @@ export default function OrderForm() {
               {isPaying ? "Redirection vers Stripe…" : "Payer"}
             </button>
 
-            <p className="mt-3 text-xs text-gray-500">
-              Vous serez redirigé vers Stripe pour finaliser le paiement.
-            </p>
+            <p className="mt-3 text-xs text-gray-500">Vous serez redirigé vers Stripe pour finaliser le paiement.</p>
           </div>
 
           {/* Trust */}
