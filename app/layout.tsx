@@ -66,7 +66,7 @@ export default function RootLayout({
             <div className="container mx-auto px-4">
               <div className="grid md:grid-cols-3 gap-8">
                 <div>
-                  <h3 className="text-white font-bold mb-4">IPP</h3>
+                <img className="h-10 w-auto" src="/img/Fichier-3.webp" alt="logo ipp" />
                   <p className="text-sm">
                     Votre partenaire pour l&apos;impression de documents électoraux.
                     Service dédié aux mairies françaises.
