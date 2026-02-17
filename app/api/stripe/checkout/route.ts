@@ -12,7 +12,7 @@ const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SE
   auth: { persistSession: false },
 });
 
-// ---- Zod schemas (strict unions)
+// ---- Zod schemas
 const professionsItemSchema = z.object({
   productKind: z.literal("professions_de_foi"),
   quantity: z.number().int().positive(),
@@ -62,49 +62,8 @@ function itemLabel(item: CartItem): string {
     const fmt = item.bulletinFormat === "liste_5_31" ? "Liste 5–31" : "Liste 32+";
     return `${productLabel(item.productKind)} - ${fmt} - ${item.impression === "recto" ? "Recto" : "Recto-verso"}`;
   }
-  const af =
-    item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420";
+  const af = item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420";
   return `${productLabel(item.productKind)} - ${af}`;
-}
-
-function safeErrorMessage(err: unknown): string {
-  if (err instanceof z.ZodError) {
-    return err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
-  }
-  if (err instanceof Error) return err.message;
-  if (typeof err === "string") return err;
-  if (err && typeof err === "object") {
-    const anyErr = err as any;
-    if (typeof anyErr.message === "string") return anyErr.message;
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return "Unknown error";
-    }
-  }
-  return "Unknown error";
-}
-
-function safeErrorDetails(err: unknown): Record<string, unknown> | undefined {
-  if (!err || typeof err !== "object") return undefined;
-  const anyErr = err as any;
-
-  const details: Record<string, unknown> = {};
-  for (const k of ["name", "type", "code", "statusCode", "param", "details", "hint"]) {
-    if (anyErr[k] != null) details[k] = anyErr[k];
-  }
-
-  if (anyErr.raw && typeof anyErr.raw === "object") {
-    details.raw = {
-      message: anyErr.raw.message,
-      type: anyErr.raw.type,
-      code: anyErr.raw.code,
-      param: anyErr.raw.param,
-      request_log_url: anyErr.raw.request_log_url,
-    };
-  }
-
-  return Object.keys(details).length ? details : undefined;
 }
 
 export async function POST(req: Request) {
@@ -112,7 +71,7 @@ export async function POST(req: Request) {
     const json = await req.json();
     const body = checkoutBodySchema.parse(json);
 
-    // 1) Load pricing blocks
+    // 1) Charger les blocs de prix
     const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
@@ -122,12 +81,10 @@ export async function POST(req: Request) {
 
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
-    // 2) Server pricing
-    const pricedOrder = priceOrder(body.items, allBlocks);
+    // 2) Calculer le prix (doit inclure HT + TVA + TTC côté serveur)
+    const pricedOrder: any = priceOrder(body.items as CartItem[], allBlocks);
 
-
-    // 3) Create order
-    // IMPORTANT: ton schéma a total_ht_cents NOT NULL + tva_rate
+    // 3) Créer la commande en DB (on stocke HT/TVA/TTC)
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert({
@@ -135,15 +92,11 @@ export async function POST(req: Request) {
         currency: "eur",
         customer_email: body.customerEmail ?? null,
 
-        // ✅ compat schéma actuel
-        total_ht_cents: pricedOrder.subtotalHtCents,
-        tva_rate: pricedOrder.vatRate,
-        total_ttc_cents: pricedOrder.totalTtcCents,
-
-        // ✅ colonnes "nouveau schéma" si elles existent chez toi (ok si nullable)
-        subtotal_ht_cents: pricedOrder.subtotalHtCents,
-        vat_rate: pricedOrder.vatRate,
-        vat_cents: pricedOrder.vatCents,
+        // selon ton schéma actuel
+        subtotal_ht_cents: pricedOrder.subtotalHtCents ?? null,
+        vat_rate: pricedOrder.vatRate ?? null,
+        vat_cents: pricedOrder.vatCents ?? null,
+        total_ttc_cents: pricedOrder.totalTtcCents ?? null,
       })
       .select("id")
       .single();
@@ -151,114 +104,87 @@ export async function POST(req: Request) {
     if (orderErr) throw orderErr;
     const orderId = orderInsert.id as string;
 
-    // 4) Create order_items (compat legacy + new)
-    const itemsRows = pricedOrder.items.map((it) => {
-      const name = itemLabel(it);
-
-      const options =
-        it.productKind === "professions_de_foi"
-          ? { impression: it.impression }
-          : it.productKind === "bulletins_de_vote"
-            ? { impression: it.impression, bulletinFormat: it.bulletinFormat }
-            : { afficheFormat: it.afficheFormat };
-
-      // legacy unit
-      const legacyUnit = Math.round(it.totalHtCents / it.quantity);
-
+    // 4) Insert items
+    const itemsRows = (pricedOrder.items ?? []).map((it: any) => {
       if (it.productKind === "professions_de_foi") {
         return {
           order_id: orderId,
-
-          // legacy
-          product_type: it.productKind,
-          product_name: name,
-          options,
-          unit_price_cents: legacyUnit,
-          line_total_cents: it.totalHtCents,
-
-          // new
           product_kind: it.productKind,
           quantity: it.quantity,
           impression: it.impression,
           bulletin_format: null,
           affiche_format: null,
-          unit_ht_cents: legacyUnit,
-          total_ht_cents: it.totalHtCents,
-          pricing_breakdown: it.breakdown,
+          unit_ht_cents: it.unitHtCents ?? null,
+          total_ht_cents: it.totalHtCents ?? null,
+          pricing_breakdown: it.breakdown ?? null,
         };
       }
-
       if (it.productKind === "bulletins_de_vote") {
         return {
           order_id: orderId,
-
-          // legacy
-          product_type: it.productKind,
-          product_name: name,
-          options,
-          unit_price_cents: legacyUnit,
-          line_total_cents: it.totalHtCents,
-
-          // new
           product_kind: it.productKind,
           quantity: it.quantity,
           impression: it.impression,
-          bulletin_format: it.bulletinFormat,
+          bulletin_format: it.bulletinFormat ?? null,
           affiche_format: null,
-          unit_ht_cents: legacyUnit,
-          total_ht_cents: it.totalHtCents,
-          pricing_breakdown: it.breakdown,
+          unit_ht_cents: it.unitHtCents ?? null,
+          total_ht_cents: it.totalHtCents ?? null,
+          pricing_breakdown: it.breakdown ?? null,
         };
       }
-
-      // affiches
       return {
         order_id: orderId,
-
-        // legacy
-        product_type: it.productKind,
-        product_name: name,
-        options,
-        unit_price_cents: legacyUnit,
-        line_total_cents: it.totalHtCents,
-
-        // new
         product_kind: it.productKind,
         quantity: it.quantity,
         impression: null,
         bulletin_format: null,
-        affiche_format: it.afficheFormat,
-        unit_ht_cents: legacyUnit,
-        total_ht_cents: it.totalHtCents,
-        pricing_breakdown: it.breakdown,
+        affiche_format: it.afficheFormat ?? null,
+        unit_ht_cents: it.unitHtCents ?? null,
+        total_ht_cents: it.totalHtCents ?? null,
+        pricing_breakdown: it.breakdown ?? null,
       };
     });
 
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
 
-    // 5) Stripe checkout (montant exact : 1 ligne / item)
+    // 5) ✅ Stripe Checkout : on envoie le TTC (pour matcher ton panier)
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       customer_email: body.customerEmail,
-      line_items: pricedOrder.items.map((it) => ({
-        price_data: {
-          currency: "eur",
-          product_data: {
-            name: itemLabel(it),
-            metadata: { order_id: orderId, product_kind: it.productKind },
+      line_items: (pricedOrder.items ?? []).map((it: any) => {
+        // TTC par unité (recommandé)
+        const unitTtcCents =
+          it.unitTtcCents ??
+          it.unit_amount_ttc_cents ??
+          (typeof it.unitHtCents === "number" && typeof it.unitVatCents === "number"
+            ? it.unitHtCents + it.unitVatCents
+            : null);
+
+        if (typeof unitTtcCents !== "number") {
+          throw new Error("Prix TTC unitaire manquant (unitTtcCents).");
+        }
+
+        return {
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: itemLabel(it),
+              metadata: { order_id: orderId, product_kind: it.productKind },
+            },
+            // ✅ TTC
+            unit_amount: unitTtcCents,
           },
-          unit_amount: it.totalHtCents, // ✅ total exact HT
-        },
-        quantity: 1,
-      })),
+          quantity: it.quantity,
+        };
+      }),
       success_url: `${env.NEXT_PUBLIC_SITE_URL}/merci?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${env.NEXT_PUBLIC_SITE_URL}/commande?canceled=1`,
       metadata: { order_id: orderId },
     });
 
-    // 6) Save stripe session id
+    // 6) Sauvegarde session stripe
     const { error: updErr } = await supabaseAdmin
       .from("orders")
       .update({ stripe_session_id: session.id })
@@ -267,10 +193,9 @@ export async function POST(req: Request) {
     if (updErr) throw updErr;
 
     return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err: unknown) {
-    console.error("CHECKOUT_ERROR RAW:", err);
-    const message = safeErrorMessage(err);
-    const details = safeErrorDetails(err);
-    return NextResponse.json({ error: message, details }, { status: 400 });
+  } catch (err) {
+    console.error("CHECKOUT_ERROR:", err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
