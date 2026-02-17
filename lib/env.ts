@@ -25,6 +25,9 @@ export const env = envSchema.parse({
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+  RESEND_API_KEY: process.env.RESEND_API_KEY!,
+  MAIL_FROM: process.env.MAIL_FROM!,
+  MAIL_ADMIN_TO: process.env.MAIL_ADMIN_TO!,
 
   // ✅ AJOUT
   BASE_URL: process.env.BASE_URL,
