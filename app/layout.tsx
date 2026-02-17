@@ -32,7 +32,7 @@ export default function RootLayout({
               <nav className="flex items-center justify-between">
                 <Link href="/" className="brand">
                   <Image
-                    src="logo.png"
+                    src="/img/logo.png"
                     alt="logo ipp"
                     width={140}
                     height={40}
