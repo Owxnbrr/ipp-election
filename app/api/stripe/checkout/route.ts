@@ -71,28 +71,25 @@ export async function POST(req: Request) {
     const json = await req.json();
     const body = checkoutBodySchema.parse(json);
 
-    // 1) Charger les blocs de prix
+    // 1) Charger les blocs actifs
     const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
       .eq("is_active", true);
 
     if (blocksErr) throw blocksErr;
-
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
-    // 2) Calculer le prix (doit inclure HT + TVA + TTC côté serveur)
+    // 2) Calcul prix côté serveur (HT + TVA + TTC)
     const pricedOrder: any = priceOrder(body.items as CartItem[], allBlocks);
 
-    // 3) Créer la commande en DB (on stocke HT/TVA/TTC)
+    // 3) Créer order en DB
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert({
         status: "pending",
         currency: "eur",
         customer_email: body.customerEmail ?? null,
-
-        // selon ton schéma actuel
         subtotal_ht_cents: pricedOrder.subtotalHtCents ?? null,
         vat_rate: pricedOrder.vatRate ?? null,
         vat_cents: pricedOrder.vatCents ?? null,
@@ -104,7 +101,7 @@ export async function POST(req: Request) {
     if (orderErr) throw orderErr;
     const orderId = orderInsert.id as string;
 
-    // 4) Insert items
+    // 4) Insert order_items
     const itemsRows = (pricedOrder.items ?? []).map((it: any) => {
       if (it.productKind === "professions_de_foi") {
         return {
@@ -148,35 +145,30 @@ export async function POST(req: Request) {
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
 
-    // 5) ✅ Stripe Checkout : on envoie le TTC (pour matcher ton panier)
+    // 5) ✅ Stripe : on envoie 1 forfait TTC par ligne (quantity=1)
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       customer_email: body.customerEmail,
       line_items: (pricedOrder.items ?? []).map((it: any) => {
-        // TTC par unité (recommandé)
-        const unitTtcCents =
-          it.unitTtcCents ??
-          it.unit_amount_ttc_cents ??
-          (typeof it.unitHtCents === "number" && typeof it.unitVatCents === "number"
-            ? it.unitHtCents + it.unitVatCents
-            : null);
-
-        if (typeof unitTtcCents !== "number") {
-          throw new Error("Prix TTC unitaire manquant (unitTtcCents).");
+        const totalTtcCents = it.totalTtcCents ?? null;
+        if (typeof totalTtcCents !== "number") {
+          throw new Error("totalTtcCents manquant pour un item (Stripe).");
         }
+
+        // On met la vraie quantité dans le nom (prix palier = forfait)
+        const name = `${itemLabel(it)} — Quantité ${it.quantity}`;
 
         return {
           price_data: {
             currency: "eur",
             product_data: {
-              name: itemLabel(it),
+              name,
               metadata: { order_id: orderId, product_kind: it.productKind },
             },
-            // ✅ TTC
-            unit_amount: unitTtcCents,
+            unit_amount: totalTtcCents, // ✅ TTC forfait
           },
-          quantity: it.quantity,
+          quantity: 1, // ✅ important pour les tarifs par palier
         };
       }),
       success_url: `${env.NEXT_PUBLIC_SITE_URL}/merci?session_id={CHECKOUT_SESSION_ID}`,
@@ -184,7 +176,7 @@ export async function POST(req: Request) {
       metadata: { order_id: orderId },
     });
 
-    // 6) Sauvegarde session stripe
+    // 6) Sauvegarde stripe_session_id
     const { error: updErr } = await supabaseAdmin
       .from("orders")
       .update({ stripe_session_id: session.id })
@@ -193,9 +185,16 @@ export async function POST(req: Request) {
     if (updErr) throw updErr;
 
     return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err) {
+  } catch (err: any) {
     console.error("CHECKOUT_ERROR:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
+
+    // ✅ message plus lisible (Stripe / Supabase)
+    const message =
+      err?.message ||
+      err?.error?.message ||
+      err?.raw?.message ||
+      "Unknown error";
+
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
