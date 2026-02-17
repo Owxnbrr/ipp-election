@@ -132,26 +132,47 @@ export async function POST(req: Request) {
 
     // 4) Insert order_items
     const itemsRows = (pricedOrder.items ?? []).map((it: any) => {
-      const label = itemLabel(it as CartItem);
+    const label = itemLabel(it as CartItem);
 
-      return {
-        order_id: orderId,
-        product_type: it.productKind, // ✅ IMPORTANT (NOT NULL)
-        product_name: label,
-        quantity: it.quantity,
-        options: {
-          quantity: it.quantity,
-          impression: it.productKind !== "affiches" ? it.impression : null,
-          bulletin_format: it.productKind === "bulletins_de_vote" ? it.bulletinFormat : null,
-          affiche_format: it.productKind === "affiches" ? it.afficheFormat : null,
+    const qty = Number(it.quantity ?? 0);
 
-          total_ht_cents: pickCents(it, ["totalHtCents", "total_ht_cents"]),
-          vat_cents: pickCents(it, ["vatCents", "vat_cents"]),
-          total_ttc_cents: pickCents(it, ["totalTtcCents", "total_ttc_cents"]),
-          vat_rate: typeof it?.vatRate === "number" ? it.vatRate : vatRate,
-        },
-      };
-    });
+    // total HT calculé côté serveur (priceOrder)
+    const totalHtCents =
+      Number(it.totalHtCents ?? it.total_ht_cents ?? 0);
+
+    const vatCents =
+      Number(it.vatCents ?? it.vat_cents ?? 0);
+
+    const totalTtcCents =
+      Number(it.totalTtcCents ?? it.total_ttc_cents ?? (totalHtCents + vatCents));
+
+    // ✅ unit price HT (obligatoire dans ta DB)
+    const unitPriceCents = qty > 0 ? Math.round(totalHtCents / qty) : 0;
+
+    return {
+      order_id: orderId,
+
+      // ✅ colonnes NOT NULL
+      product_type: it.productKind,
+      product_name: label,
+      quantity: qty,
+      unit_price_cents: unitPriceCents, // ✅ IMPORTANT
+
+      // si ta table a aussi ces colonnes en NOT NULL, mets-les direct :
+      total_ht_cents: totalHtCents,
+      vat_cents: vatCents,
+      total_ttc_cents: totalTtcCents,
+
+      // tu peux garder options en JSONB
+      options: {
+        impression: it.productKind !== "affiches" ? it.impression : null,
+        bulletin_format: it.productKind === "bulletins_de_vote" ? it.bulletinFormat : null,
+        affiche_format: it.productKind === "affiches" ? it.afficheFormat : null,
+        vat_rate: typeof it?.vatRate === "number" ? it.vatRate : null,
+      },
+    };
+  });
+
 
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
