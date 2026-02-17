@@ -123,7 +123,8 @@ export async function POST(req: Request) {
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
     // 2) Server pricing
-    const pricedOrder = priceOrder(body.items, allBlocks, 0.2);
+    const pricedOrder = priceOrder(body.items, allBlocks);
+
 
     // 3) Create order
     // IMPORTANT: ton schéma a total_ht_cents NOT NULL + tva_rate
