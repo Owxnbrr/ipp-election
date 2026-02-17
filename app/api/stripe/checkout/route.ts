@@ -8,13 +8,16 @@ import { env } from "@/lib/env";
 import type { CartItem, PricingBlockRow } from "@/types";
 import { priceOrder } from "@/lib/pricing";
 
+// ✅ IMPORTANT : ne mets pas apiVersion ici (ça te créait l'erreur TS)
 const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-
 
 const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
+/** -----------------------
+ * ZOD: validation body
+ * ---------------------- */
 const professionsItemSchema = z.object({
   productKind: z.literal("professions_de_foi"),
   quantity: z.number().int().positive(),
@@ -45,28 +48,39 @@ const bodySchema = z.object({
   items: z.array(cartItemSchema).min(1),
 });
 
-function vatRateForItem(item: CartItem): number {
-  // ✅ TVA demandée:
-  // professions + bulletins: 5.5%
-  // affiches: 20%
-  if (item.productKind === "affiches") return 0.2;
-  return 0.055;
-}
-
-function labelItem(item: CartItem): string {
-  if (item.productKind === "professions_de_foi") {
-    return `Professions de foi • ${item.impression === "recto" ? "Recto" : "Recto-verso"}`;
-  }
-  if (item.productKind === "bulletins_de_vote") {
-    const fmt = item.bulletinFormat === "liste_5_31" ? "Liste 5–31" : "Liste 32+";
-    return `Bulletins de vote • ${fmt} • ${item.impression === "recto" ? "Recto" : "Recto-verso"}`;
-  }
-  return `Affiches • ${item.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420"}`;
-}
-
+/** -----------------------
+ * Helpers
+ * ---------------------- */
 function safeInt(n: unknown, fallback = 0) {
-  const x = Number(n);
+  const x = typeof n === "number" ? n : Number(n);
   return Number.isFinite(x) ? Math.round(x) : fallback;
+}
+
+function labelItem(it: CartItem) {
+  if (it.productKind === "professions_de_foi") {
+    return `Professions de foi • ${it.impression === "recto" ? "Recto" : "Recto-verso"}`;
+  }
+  if (it.productKind === "bulletins_de_vote") {
+    const fmt = it.bulletinFormat === "liste_5_31" ? "Liste 5–31" : "Liste 32+";
+    return `Bulletins de vote • ${fmt} • ${it.impression === "recto" ? "Recto" : "Recto-verso"}`;
+  }
+  return `Affiches • ${it.afficheFormat === "grand_format" ? "Grand format 594×841" : "Petit format 297×420"}`;
+}
+
+function optionsJson(it: CartItem) {
+  if (it.productKind === "professions_de_foi") return { impression: it.impression };
+  if (it.productKind === "bulletins_de_vote") return { impression: it.impression, bulletin_format: it.bulletinFormat };
+  return { affiche_format: it.afficheFormat };
+}
+
+function bulletinFormatOrNull(it: CartItem) {
+  return it.productKind === "bulletins_de_vote" ? it.bulletinFormat : null;
+}
+function impressionOrNull(it: CartItem) {
+  return it.productKind !== "affiches" ? it.impression : null;
+}
+function afficheFormatOrNull(it: CartItem) {
+  return it.productKind === "affiches" ? it.afficheFormat : null;
 }
 
 export async function POST(req: Request) {
@@ -74,128 +88,132 @@ export async function POST(req: Request) {
     const json = await req.json();
     const body = bodySchema.parse(json);
 
-    // 1) Récupérer les paliers actifs
-    const { data: blocks, error: blocksError } = await supabaseAdmin
+    // 1) Charge les blocs actifs (source de vérité)
+    const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
       .eq("is_active", true);
 
-    if (blocksError) throw blocksError;
-
+    if (blocksErr) throw blocksErr;
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
-    // 2) Calcul HT (source de vérité)
-    const pricedOrder = priceOrder(body.items as CartItem[], allBlocks);
+    // 2) Pricing serveur (HT + TVA + TTC)
+    const priced = priceOrder(body.items as CartItem[], allBlocks);
 
-    // 3) Ajouter TVA + TTC sur chaque item + total
-    const enrichedItems = (pricedOrder.items ?? []).map((it: any) => {
-      const qty = safeInt(it.quantity, 0);
-      const totalHtCents = safeInt(it.totalHtCents ?? it.total_ht_cents, 0);
+    // On supporte plusieurs formes de retour (selon ton pricing.ts)
+    const pricedItems: any[] = priced?.items ?? [];
+    const subtotalHtCents = safeInt(priced?.subtotalHtCents ?? priced?.subtotal_ht_cents ?? priced?.totalHtCents, 0);
+    const vatCents = safeInt(priced?.vatCents ?? priced?.vat_cents, 0);
+    const totalTtcCents = safeInt(priced?.totalTtcCents ?? priced?.total_ttc_cents, subtotalHtCents + vatCents);
 
-      // ⚠️ on retrouve le CartItem original pour savoir la TVA
-      const original = body.items.find((x) => {
-        // match “structurel” (ok pour ce projet)
-        if (x.productKind !== it.productKind) return false;
-        if (x.productKind === "affiches") return (x as any).afficheFormat === it.afficheFormat && x.quantity === it.quantity;
-        if (x.productKind === "professions_de_foi") return (x as any).impression === it.impression && x.quantity === it.quantity;
-        if (x.productKind === "bulletins_de_vote")
-          return (
-            (x as any).impression === it.impression &&
-            (x as any).bulletinFormat === it.bulletinFormat &&
-            x.quantity === it.quantity
-          );
-        return false;
-      }) as CartItem | undefined;
+    // Sécurité : jamais 0 si panier non vide (évite null / NaN)
+    if (!pricedItems.length || totalTtcCents <= 0) {
+      return NextResponse.json({ error: "Prix invalide (pricing serveur)." }, { status: 400 });
+    }
 
-      const rate = vatRateForItem(original ?? (it as CartItem));
-      const vatCents = Math.round(totalHtCents * rate);
-      const totalTtcCents = totalHtCents + vatCents;
+    // 3) Crée la commande en DB (orders) AVANT Stripe
+    // ✅ Remplir les champs NOT NULL
+    const orderPayload: any = {
+      status: "pending",
+      currency: "eur",
+      customer_email: body.customerEmail ?? null,
 
-      const unitPriceHtCents = qty > 0 ? Math.round(totalHtCents / qty) : 0;
+      // Champs importants (NOT NULL chez toi)
+      total_ht_cents: subtotalHtCents,
+      total_ttc_cents: totalTtcCents,
 
-      return {
-        ...it,
-        vatRate: rate,
-        totalHtCents,
-        vatCents,
-        totalTtcCents,
-        unitPriceHtCents,
-      };
-    });
+      // Si ta DB utilise aussi ces champs :
+      subtotal_ht_cents: subtotalHtCents,
+      vat_cents: vatCents,
 
-    const subtotalHtCents = enrichedItems.reduce((s: number, x: any) => s + safeInt(x.totalHtCents), 0);
-    const vatCents = enrichedItems.reduce((s: number, x: any) => s + safeInt(x.vatCents), 0);
-    const totalTtcCents = subtotalHtCents + vatCents;
+      // champs "rate" au niveau order: si tu as mix TVA, on met null/0 (mais surtout pas undefined)
+      // (si ta colonne est NOT NULL, mets 0)
+      vat_rate: 0,
+      tva_rate: 0,
 
-    // 4) Créer la commande en DB (orders)
-    const { data: orderInsert, error: orderError } = await supabaseAdmin
+      shipping_cents: 0,
+    };
+
+    const { data: orderRow, error: orderErr } = await supabaseAdmin
       .from("orders")
-      .insert({
-        status: "pending",
-        total_ht_cents: subtotalHtCents,
-        vat_cents: vatCents,
-        total_ttc_cents: totalTtcCents,
-        // si tu veux garder une info globale (optionnelle)
-        tva_rate: null,
-      })
+      .insert(orderPayload)
       .select("id")
       .single();
 
-    if (orderError) throw orderError;
+    if (orderErr) throw orderErr;
+    const orderId = orderRow.id as string;
 
-    const orderId = orderInsert.id as string;
+    // 4) Insert order_items avec tous les champs sensibles NOT NULL
+    const itemsRows = (body.items as CartItem[]).map((it, idx) => {
+      const p = pricedItems[idx] ?? {};
 
-    // 5) Insérer les lignes (order_items) - ZÉRO NULL sur NOT NULL
-    const itemsRows = enrichedItems.map((it: any) => {
-      const qty = safeInt(it.quantity, 0);
+      const itemHt = safeInt(p.totalHtCents ?? p.total_ht_cents ?? p.htCents, 0);
+      const itemVat = safeInt(p.vatCents ?? p.vat_cents, 0);
+      const itemTtc = safeInt(p.totalTtcCents ?? p.total_ttc_cents ?? p.ttcCents, itemHt + itemVat);
+
+      // TVA rate par item (si dispo)
+      const vatRate = typeof p.vatRate === "number" ? p.vatRate : typeof p.vat_rate === "number" ? p.vat_rate : null;
 
       return {
         order_id: orderId,
 
-        product_type: it.productKind,
-        product_name: labelItem(it as CartItem),
+        // ✅ NOT NULL chez toi
+        product_type: it.productKind,               // ex: "professions_de_foi"
+        quantity: it.quantity,                      // int
+        unit_price_cents: itemTtc,                  // on stocke le TTC comme "prix unitaire" de la ligne
+        line_total_cents: itemTtc,                  // idem (si tu charges la ligne en 1 seul bloc)
 
-        quantity: qty,
+        // Champs détaillés (tu les as dans ta table)
+        product_kind: it.productKind,
+        product_name: labelItem(it),
+        options: optionsJson(it),
 
-        // ✅ requis (chez toi c'est NOT NULL)
-        unit_price_cents: safeInt(it.unitPriceHtCents, 0),
+        impression: impressionOrNull(it),
+        bulletin_format: bulletinFormatOrNull(it),
+        affiche_format: afficheFormatOrNull(it),
 
-        // ✅ colonnes ajoutées via SQL plus haut
-        total_ht_cents: safeInt(it.totalHtCents, 0),
-        vat_cents: safeInt(it.vatCents, 0),
-        total_ttc_cents: safeInt(it.totalTtcCents, 0),
-        vat_rate: typeof it.vatRate === "number" ? it.vatRate : null,
+        unit_ht_cents: itemHt,
+        total_ht_cents: itemHt,
+        vat_cents: itemVat,
+        total_ttc_cents: itemTtc,
+        vat_rate: vatRate,
 
-        options: {
-          impression: it.productKind !== "affiches" ? it.impression : null,
-          bulletin_format: it.productKind === "bulletins_de_vote" ? it.bulletinFormat : null,
-          affiche_format: it.productKind === "affiches" ? it.afficheFormat : null,
-        },
+        pricing_breakdown: p.pricingBreakdown ?? p.pricing_breakdown ?? null,
       };
     });
 
-    const { error: itemsError } = await supabaseAdmin.from("order_items").insert(itemsRows);
-    if (itemsError) throw itemsError;
+    const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
+    if (itemsErr) throw itemsErr;
 
-    // 6) Stripe Checkout: on facture TTC
-    // ✅ pour éviter des qty énormes (50000 etc), on met quantity=1 et unit_amount = total TTC de la ligne
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = enrichedItems.map((it: any) => {
-      const label = labelItem(it as CartItem);
-      const qty = safeInt(it.quantity, 0);
+    // 5) Stripe line_items : on charge chaque item TTC (quantité = 1)
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = (body.items as CartItem[]).map(
+      (it, idx) => {
+        const p = pricedItems[idx] ?? {};
+        const itemHt = safeInt(p.totalHtCents ?? p.total_ht_cents, 0);
+        const itemVat = safeInt(p.vatCents ?? p.vat_cents, 0);
+        const itemTtc = safeInt(p.totalTtcCents ?? p.total_ttc_cents, itemHt + itemVat);
+        const vatRate =
+          typeof p.vatRate === "number" ? p.vatRate : typeof p.vat_rate === "number" ? p.vat_rate : null;
 
-      return {
-        quantity: 1,
-        price_data: {
-          currency: "eur",
-          unit_amount: safeInt(it.totalTtcCents, 0), // ✅ TTC
-          product_data: {
-            name: label,
-            description: `Quantité : ${qty} • HT ${Math.round(it.totalHtCents) / 100}€ • TVA ${(it.vatRate * 100).toFixed(1).replace(".", ",")}%`,
+        const label = labelItem(it);
+
+        return {
+          quantity: 1,
+          price_data: {
+            currency: "eur",
+            unit_amount: itemTtc, // ✅ TTC (avec TVA)
+            product_data: {
+              name: label,
+              description: `Quantité: ${it.quantity} • HT: ${(itemHt / 100).toFixed(2)}€ • TVA: ${(itemVat / 100).toFixed(
+                2
+              )}€${vatRate != null ? ` (${(vatRate * 100).toFixed(1).replace(".", ",")}%)` : ""}`,
+            },
           },
-        },
-      };
-    });
+        };
+      }
+    );
 
+    // 6) Crée la session Stripe
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: body.customerEmail,
@@ -206,6 +224,14 @@ export async function POST(req: Request) {
         order_id: orderId,
       },
     });
+
+    // 7) Sauvegarde l’id de session Stripe dans orders
+    const { error: updErr } = await supabaseAdmin
+      .from("orders")
+      .update({ stripe_session_id: session.id })
+      .eq("id", orderId);
+
+    if (updErr) throw updErr;
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err) {

@@ -3,12 +3,18 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Link from 'next/link';
 import CookieBanner from "@/components/CookieBanner";
+import Image from "next/image";
+
 
 const inter = Inter({ subsets: ['latin'] });
+
 
 export const metadata: Metadata = {
   title: 'IPP - Impression électorale pour mairies',
   description: 'Commandez vos affiches, bulletins et professions de foi électorales en ligne',
+  icons: {
+    icon: "/img/favicon.png",
+  },
 };
 
 export default function RootLayout({
@@ -24,8 +30,15 @@ export default function RootLayout({
           <header className="bg-white border-b border-gray-200">
             <div className="container mx-auto px-4 py-4">
               <nav className="flex items-center justify-between">
-                <Link href="/" className="text-2xl font-bold text-primary-600">
-                  IPP
+                <Link href="/" className="brand">
+                  <Image
+                    src="logo.png"
+                    alt="logo ipp"
+                    width={140}
+                    height={40}
+                    className="brand_logo"
+                    priority
+                  />
                 </Link>
                 <div className="flex items-center gap-6">
                   <Link 
