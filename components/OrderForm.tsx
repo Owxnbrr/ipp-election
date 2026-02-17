@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CartItem, ProductKind, ImpressionType, BulletinFormat, AfficheFormat } from "@/types";
 import { formatCents } from "@/lib/pricing";
 
@@ -53,6 +53,12 @@ function buildCartItem(form: FormState, qty: number): CartItem {
   return { productKind: "affiches", quantity: qty, afficheFormat: form.afficheFormat };
 }
 
+/**
+ * Structure attendue depuis /api/pricing/quote
+ * (on garde "any" souple pour ne pas casser si tu ajustes le serveur)
+ */
+type Quote = any;
+
 export default function OrderForm() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [quantity, setQuantity] = useState<string>("");
@@ -66,10 +72,12 @@ export default function OrderForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
 
-  // UI helper totals (estimation TTC à 20% sur le panier — le backend fait foi)
+  // ✅ Quote serveur (prix exact avant paiement)
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
   const totals = useMemo(() => {
-    // Ici on ne recalcule pas le vrai prix (il vient serveur). On affiche juste un UX “panier”.
-    // Tu peux brancher une route /api/pricing/quote plus tard si tu veux un total exact avant paiement.
     return {
       count: cart.length,
     };
@@ -80,6 +88,52 @@ export default function OrderForm() {
     const n = Number(quantity);
     return Number.isFinite(n) && n > 0;
   }, [quantity]);
+
+  // ✅ Récupère le prix exact à chaque changement panier
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      setQuoteError(null);
+
+      if (!cart.length) {
+        setQuote(null);
+        return;
+      }
+
+      setQuoteLoading(true);
+      try {
+        const res = await fetch("/api/pricing/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: cart }),
+        });
+
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setQuote(null);
+          setQuoteError(data?.error ?? "Impossible de calculer le prix.");
+          return;
+        }
+
+        setQuote(data);
+      } catch (e) {
+        if (cancelled) return;
+        setQuote(null);
+        setQuoteError(e instanceof Error ? e.message : "Erreur réseau (quote).");
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [JSON.stringify(cart)]);
 
   async function onAddToCart() {
     setError(null);
@@ -137,6 +191,12 @@ export default function OrderForm() {
     }
   }
 
+  // Helpers affichage quote par item (même ordre que le panier)
+  const quoteItems: any[] = quote?.items ?? [];
+  const quoteSubtotalHt = quote?.subtotalHtCents ?? null;
+  const quoteVat = quote?.vatCents ?? null;
+  const quoteTotalTtc = quote?.totalTtcCents ?? null;
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       {/* LEFT: Form */}
@@ -164,7 +224,7 @@ export default function OrderForm() {
               />
             </div>
 
-            {/* Product */}
+            {/* Product + Qty */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Produit</label>
@@ -188,7 +248,6 @@ export default function OrderForm() {
                 </select>
               </div>
 
-              {/* Quantity */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Quantité</label>
                 <input
@@ -280,9 +339,17 @@ export default function OrderForm() {
               Ajouter au panier
             </button>
 
-            <p className="text-xs text-gray-500">
-              Le prix final est calculé côté serveur selon les paliers tarifaires.
-            </p>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
+              <div className="font-semibold text-gray-900">TVA appliquée</div>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-gray-600">
+                <li>Professions de foi : 5,5%</li>
+                <li>Bulletins de vote : 5,5%</li>
+                <li>Affiches : 20%</li>
+              </ul>
+              <p className="mt-2 text-gray-500">
+                Le prix affiché dans le panier est calculé côté serveur selon les paliers tarifaires.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -304,31 +371,131 @@ export default function OrderForm() {
                   Aucun item pour le moment.
                 </div>
               ) : (
-                cart.map((it, idx) => (
-                  <div key={idx} className="rounded-xl border border-gray-200 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">{labelItem(it)}</p>
-                        <p className="mt-1 text-sm text-gray-600">Quantité : {it.quantity}</p>
-                      </div>
+                cart.map((it, idx) => {
+                  const qi = quoteItems?.[idx]; // même index que cart
+                  const ht = qi?.totalHtCents ?? null;
+                  const vat = qi?.vatCents ?? null;
+                  const ttc = qi?.totalTtcCents ?? (ht != null && vat != null ? ht + vat : null);
+                  const vatRate = qi?.vatRate ?? null;
 
-                      <button
-                        type="button"
-                        onClick={() => removeItem(idx)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        Supprimer
-                      </button>
+                  const originalQty = it.quantity;
+                  const billedQty = qi?.quantity ?? originalQty;
+                  const qtyChanged = billedQty !== originalQty;
+
+                  return (
+                    <div key={idx} className="rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-900">{labelItem(it)}</p>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            Quantité : {originalQty}
+                            {qtyChanged ? (
+                              <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                facturée : {billedQty}
+                              </span>
+                            ) : null}
+                          </p>
+
+                          {/* ✅ PRIX AVANT PAIEMENT */}
+                          <div className="mt-2 space-y-1 text-xs text-gray-600">
+                            {quoteLoading && (
+                              <div className="text-gray-500">Calcul du prix…</div>
+                            )}
+
+                            {!quoteLoading && quoteError && (
+                              <div className="text-red-600">{quoteError}</div>
+                            )}
+
+                            {!quoteLoading && !quoteError && quote && (
+                              <>
+                                {ttc != null && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span>Total TTC</span>
+                                    <span className="font-semibold text-gray-900">
+                                      {formatCents(ttc)}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {ht != null && vat != null && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span>
+                                      Détail
+                                      {vatRate != null ? (
+                                        <span className="ml-1 text-gray-500">
+                                          (TVA {(vatRate * 100).toFixed(1).replace(".", ",")}%)
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                    <span className="text-gray-700">
+                                      {formatCents(ht)} HT + {formatCents(vat)} TVA
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
+
+            {/* ✅ TOTAL PANIER AVANT PAYER */}
+            {cart.length > 0 && (
+              <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
+                {quoteLoading ? (
+                  <div className="text-gray-500">Calcul du total…</div>
+                ) : quoteError ? (
+                  <div className="text-red-600">{quoteError}</div>
+                ) : quote ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-700">Sous-total HT</span>
+                      <span className="font-medium text-gray-900">
+                        {quoteSubtotalHt != null ? formatCents(quoteSubtotalHt) : "—"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-700">TVA</span>
+                      <span className="font-medium text-gray-900">
+                        {quoteVat != null ? formatCents(quoteVat) : "—"}
+                      </span>
+                    </div>
+
+                    <div className="h-px w-full bg-gray-200" />
+
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-900">Total TTC</span>
+                      <span className="font-semibold text-gray-900">
+                        {quoteTotalTtc != null ? formatCents(quoteTotalTtc) : "—"}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-500">
+                      Total calculé côté serveur selon les paliers + TVA (5,5% / 20%).
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             <button
               type="button"
               onClick={onPay}
-              disabled={isPaying || cart.length === 0}
+              disabled={isPaying || cart.length === 0 || !!quoteError || quoteLoading}
               className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white
                         shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
