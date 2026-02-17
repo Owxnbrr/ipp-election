@@ -85,18 +85,21 @@ export async function POST(req: Request) {
 
     // 3) Créer order en DB
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        status: "pending",
-        currency: "eur",
-        customer_email: body.customerEmail ?? null,
-        subtotal_ht_cents: pricedOrder.subtotalHtCents ?? null,
-        vat_rate: pricedOrder.vatRate ?? null,
-        vat_cents: pricedOrder.vatCents ?? null,
-        total_ttc_cents: pricedOrder.totalTtcCents ?? null,
-      })
-      .select("id")
-      .single();
+    .from("orders")
+    .insert({
+      status: "pending",
+      currency: "eur",
+      customer_email: body.customerEmail ?? null,
+
+      // ✅ noms qui match ton schéma Supabase
+      total_ht_cents: pricedOrder.subtotalHtCents,
+      tva_rate: pricedOrder.vatRate,
+      total_ttc_cents: pricedOrder.totalTtcCents,
+      shipping_cents: 0,
+    })
+    .select("id")
+    .single();
+
 
     if (orderErr) throw orderErr;
     const orderId = orderInsert.id as string;
