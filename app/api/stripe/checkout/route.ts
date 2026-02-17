@@ -68,13 +68,28 @@ function itemLabel(item: CartItem): string {
   return `${productLabel(item.productKind)} - ${af}`;
 }
 
+// ✅ helper: récupère un champ cents peu importe le casing
+function pickCents(obj: any, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
-    // 1) Validate body
     const json = await req.json();
     const body = checkoutBodySchema.parse(json);
 
-    // 2) Load active pricing blocks
+    // ✅ URL site robuste (prod Netlify + local)
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.BASE_URL ||
+      env.NEXT_PUBLIC_SITE_URL ||
+      "http://localhost:3000";
+
+    // 1) Pricing blocks
     const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
@@ -84,11 +99,19 @@ export async function POST(req: Request) {
 
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
-    // 3) Server pricing (source of truth)
-    // priceOrder doit déjà appliquer TVA (5.5% / 20%) selon tes règles.
-    const pricedOrder = priceOrder(body.items as CartItem[], allBlocks);
+    // 2) Prix serveur
+    const pricedOrder: any = priceOrder(body.items as CartItem[], allBlocks);
 
-    // 4) Create order row (match Supabase schema)
+    const subtotalHtCents = pickCents(pricedOrder, ["subtotalHtCents", "subtotal_ht_cents"]);
+    const vatCents = pickCents(pricedOrder, ["vatCents", "vat_cents"]);
+    const totalTtcCents = pickCents(pricedOrder, ["totalTtcCents", "total_ttc_cents"]);
+    const vatRate = typeof pricedOrder?.vatRate === "number" ? pricedOrder.vatRate : null;
+
+    if (subtotalHtCents == null || totalTtcCents == null) {
+      throw new Error("Prix serveur invalide (subtotal/total manquant). Vérifie la sortie de priceOrder().");
+    }
+
+    // 3) Create order
     const { data: orderInsert, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert({
@@ -96,10 +119,9 @@ export async function POST(req: Request) {
         currency: "eur",
         customer_email: body.customerEmail ?? null,
 
-        // ✅ match tes colonnes Supabase
-        total_ht_cents: pricedOrder.subtotalHtCents,
-        tva_rate: pricedOrder.vatRate,
-        total_ttc_cents: pricedOrder.totalTtcCents,
+        total_ht_cents: subtotalHtCents,
+        tva_rate: vatRate,
+        total_ttc_cents: totalTtcCents,
         shipping_cents: 0,
       })
       .select("id")
@@ -108,34 +130,24 @@ export async function POST(req: Request) {
     if (orderErr) throw orderErr;
     const orderId = orderInsert.id as string;
 
-    // 5) Insert order_items (match Supabase schema: product_type, product_name, options)
-    const itemsRows = pricedOrder.items.map((it: any) => {
-      const label = itemLabel(it);
+    // 4) Insert order_items
+    const itemsRows = (pricedOrder.items ?? []).map((it: any) => {
+      const label = itemLabel(it as CartItem);
 
       return {
         order_id: orderId,
-
-        // ✅ colonnes NOT NULL attendues
-        product_type: it.productKind, // ex: "professions_de_foi"
+        product_type: it.productKind, // ✅ IMPORTANT (NOT NULL)
         product_name: label,
-
-        // ✅ options jsonb : tu mets tout ce que tu veux tracer
         options: {
           quantity: it.quantity,
-
           impression: it.productKind !== "affiches" ? it.impression : null,
           bulletin_format: it.productKind === "bulletins_de_vote" ? it.bulletinFormat : null,
           affiche_format: it.productKind === "affiches" ? it.afficheFormat : null,
 
-          // pricing (si dispo dans priceOrder)
-          unit_ht_cents: it.unitHtCents ?? null,
-          total_ht_cents: it.totalHtCents ?? null,
-          vat_rate: it.vatRate ?? pricedOrder.vatRate ?? null,
-          vat_cents: it.vatCents ?? null,
-          total_ttc_cents: it.totalTtcCents ?? null,
-
-          // breakdown debug
-          pricing_breakdown: it.breakdown ?? null,
+          total_ht_cents: pickCents(it, ["totalHtCents", "total_ht_cents"]),
+          vat_cents: pickCents(it, ["vatCents", "vat_cents"]),
+          total_ttc_cents: pickCents(it, ["totalTtcCents", "total_ttc_cents"]),
+          vat_rate: typeof it?.vatRate === "number" ? it.vatRate : vatRate,
         },
       };
     });
@@ -143,31 +155,37 @@ export async function POST(req: Request) {
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsRows);
     if (itemsErr) throw itemsErr;
 
-    // 6) Stripe checkout — ✅ TVA incluse (TTC)
-    // IMPORTANT: comme tes prix sont par paliers/blocs, on crée 1 ligne = 1 config,
-    // avec quantity = 1 et unit_amount = total TTC de la ligne.
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      customer_email: body.customerEmail,
-      line_items: pricedOrder.items.map((it: any) => ({
+    // 5) Stripe checkout — ✅ TVA incluse (TTC)
+    const lineItems = (pricedOrder.items ?? []).map((it: any) => {
+      const totalTtc = pickCents(it, ["totalTtcCents", "total_ttc_cents"]);
+      if (totalTtc == null || totalTtc <= 0) {
+        throw new Error(`Prix TTC invalide pour un item (${itemLabel(it)}).`);
+      }
+
+      return {
         price_data: {
           currency: "eur",
           product_data: {
             name: `${itemLabel(it)} (Qté: ${it.quantity})`,
             metadata: { order_id: orderId, product_kind: it.productKind },
           },
-          // ✅ TTC (donc TVA incluse sur Stripe)
-          unit_amount: it.totalTtcCents ?? it.totalHtCents ?? 0,
+          unit_amount: totalTtc, // ✅ TTC
         },
         quantity: 1,
-      })),
-      success_url: `${env.NEXT_PUBLIC_SITE_URL}/merci?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.NEXT_PUBLIC_SITE_URL}/commande?canceled=1`,
+      };
+    });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      customer_email: body.customerEmail,
+      line_items: lineItems,
+      success_url: `${siteUrl}/merci?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/commande?canceled=1`,
       metadata: { order_id: orderId },
     });
 
-    // 7) Save Stripe session id
+    // 6) Save stripe session id
     const { error: updErr } = await supabaseAdmin
       .from("orders")
       .update({ stripe_session_id: session.id })
@@ -176,9 +194,15 @@ export async function POST(req: Request) {
     if (updErr) throw updErr;
 
     return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err) {
+  } catch (err: any) {
     console.error("CHECKOUT_ERROR:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 400 });
+
+    // ✅ Stripe errors lisibles
+    const stripeMsg =
+      err?.raw?.message ||
+      err?.message ||
+      "Unknown error";
+
+    return NextResponse.json({ error: stripeMsg }, { status: 400 });
   }
 }
