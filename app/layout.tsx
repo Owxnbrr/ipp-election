@@ -30,7 +30,7 @@ export default function RootLayout({
           <header className="bg-white border-b border-gray-200">
             <div className="container mx-auto px-4 py-4">
               <nav className="flex items-center justify-between">
-                <img src="/img/logo.png" alt="logo ipp" />
+                <img className="h-10 w-auto" src="/img/logo.png" alt="logo ipp" />
                 <div className="flex items-center gap-6">
                   <Link 
                     href="/commande" 
