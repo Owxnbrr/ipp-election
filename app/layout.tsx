@@ -73,7 +73,7 @@ export default function RootLayout({
                   <h4 className="text-white font-semibold mb-4">Légal</h4>
                   <ul className="space-y-2 text-sm">
                     <li>
-                      <Link href="/cgv" className="hover:text-white transition-colors transition duration-200 underline">
+                      <Link href="/cgv" className="hover:text-white transition-colors">
                         Conditions générales de vente
                       </Link>
                     </li>
