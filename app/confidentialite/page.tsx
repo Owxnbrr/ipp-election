@@ -4,7 +4,6 @@ export default function ConfidentialitePage() {
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold mb-8">Politique de Confidentialité</h1>
-          
           <div className="prose max-w-none space-y-8">
             <section>
               <h2 className="text-2xl font-bold mb-4">1. Introduction</h2>

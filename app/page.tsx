@@ -4,7 +4,6 @@ import { Printer, FileText, Newspaper } from 'lucide-react';
 export default function HomePage() {
   return (
     <div>
-      {/* Hero Section */}
       <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-20">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold mb-6">
@@ -25,7 +24,6 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-center mb-12">Nos produits électoraux</h2>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Affiches */}
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
                 <Newspaper className="w-6 h-6 text-primary-600" />
@@ -42,7 +40,6 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* Bulletins */}
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
                 <FileText className="w-6 h-6 text-primary-600" />
@@ -59,7 +56,6 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* Professions de foi */}
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
                 <Printer className="w-6 h-6 text-primary-600" />
@@ -80,7 +76,6 @@ export default function HomePage() {
       </section>
 
 
-      {/* How it works */}
       <section className="py-20 bg-gray-100">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">
@@ -131,7 +126,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-6">

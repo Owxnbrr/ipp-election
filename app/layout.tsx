@@ -26,7 +26,6 @@ export default function RootLayout({
     <html lang="fr">
       <body className={inter.className}>
         <div className="min-h-screen flex flex-col">
-          {/* Header */}
           <header className="bg-white border-b border-gray-200">
             <div className="container mx-auto px-4 py-4">
               <nav className="flex items-center justify-between">
@@ -55,13 +54,11 @@ export default function RootLayout({
             </div>
           </header>
 
-          {/* Main content */}
           <main className="flex-1">
             {children}
               <CookieBanner />
           </main>
 
-          {/* Footer */}
           <footer className="bg-gray-900 text-gray-300 py-8 mt-20">
             <div className="container mx-auto px-4">
               <div className="grid md:grid-cols-3 gap-8">

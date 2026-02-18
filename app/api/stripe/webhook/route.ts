@@ -4,7 +4,6 @@ import { stripe } from '@/lib/stripe';
 import { getServiceSupabase } from '@/lib/supabase';
 import Stripe from 'stripe';
 
-// Important: désactiver le parsing automatique du body pour les webhooks
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
@@ -24,7 +23,6 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    // Vérifier la signature du webhook
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message);
@@ -34,7 +32,6 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceSupabase();
 
   try {
-    // Vérifier l'idempotence - événement déjà traité ?
     const { data: existingEvent } = await supabase
       .from('stripe_events')
       .select('id, processed')
@@ -46,7 +43,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, already_processed: true });
     }
 
-    // Enregistrer l'événement (ou le mettre à jour)
     if (existingEvent) {
       await supabase
         .from('stripe_events')
@@ -66,13 +62,11 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // Traiter les événements spécifiques
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         console.log('Checkout session completed:', session.id);
 
-        // Récupérer l'order_id depuis les metadata
         const orderId = session.metadata?.order_id;
 
         if (!orderId) {
@@ -80,7 +74,6 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Mettre à jour le statut de la commande
         const { error: updateError } = await supabase
           .from('orders')
           .update({
@@ -96,15 +89,10 @@ export async function POST(request: NextRequest) {
 
         console.log('Order marked as paid:', orderId);
 
-        // Marquer l'événement comme traité
         await supabase
           .from('stripe_events')
           .update({ processed: true })
           .eq('event_id', event.id);
-
-        // TODO: Envoyer un email de confirmation (via Resend, Sendgrid, etc.)
-        // await sendOrderConfirmationEmail(orderId);
-
         break;
       }
 
@@ -112,7 +100,6 @@ export async function POST(request: NextRequest) {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         console.log('Payment intent succeeded:', paymentIntent.id);
 
-        // Optionnel: traiter d'autres événements
         await supabase
           .from('stripe_events')
           .update({ processed: true })
@@ -124,15 +111,10 @@ export async function POST(request: NextRequest) {
       case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         console.log('Payment intent failed:', paymentIntent.id);
-
-        // TODO: Gérer les échecs de paiement
-        // Peut-être marquer la commande comme 'failed'
-
         await supabase
           .from('stripe_events')
           .update({ processed: true })
           .eq('event_id', event.id);
-
         break;
       }
 

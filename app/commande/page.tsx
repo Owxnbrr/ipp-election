@@ -6,7 +6,6 @@ export default function CommandePage() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-10 sm:py-14">
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-6xl">
-          {/* Header */}
           <div className="mb-10 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-green-500" />
@@ -22,7 +21,6 @@ export default function CommandePage() {
             </p>
           </div>
 
-          {/* Main card */}
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 px-6 py-5 sm:px-8">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -33,7 +31,6 @@ export default function CommandePage() {
                   </p>
                 </div>
 
-                {/* Steps */}
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white">

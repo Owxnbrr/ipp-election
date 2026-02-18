@@ -12,11 +12,10 @@ type OrderRow = {
   vat_cents: number;
   total_ttc_cents: number;
 
-  // champs “anciens” possibles chez toi : on les laisse optionnels pour ne pas casser
   mairie_name?: string | null;
   commune?: string | null;
   shipping_cents?: number | null;
-  total_ht_cents?: number | null; // si tu l’avais avant
+  total_ht_cents?: number | null
   shipping_address?: {
     street?: string;
     postal_code?: string;
@@ -79,7 +78,6 @@ export default async function MerciPage({
     }
   }
 
-  // Fallbacks si tu as encore des champs historiques
   const shippingCents = order?.shipping_cents ?? 0;
   const subtotalHt = order?.subtotal_ht_cents ?? order?.total_ht_cents ?? 0;
   const vatCents = order?.vat_cents ?? Math.max(0, (order?.total_ttc_cents ?? 0) - subtotalHt - shippingCents);

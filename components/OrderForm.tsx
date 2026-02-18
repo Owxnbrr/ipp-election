@@ -66,10 +66,8 @@ export default function OrderForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
 
-  // ✅ fichiers
   const [files, setFiles] = useState<File[]>([]);
 
-  // ✅ Quote serveur
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -151,14 +149,13 @@ export default function OrderForm() {
     if (!list) return;
     const picked = Array.from(list);
 
-    // filtre simple (tu peux élargir)
     const allowed = picked.filter((f) => {
       const t = (f.type || "").toLowerCase();
       return (
         t.includes("pdf") ||
         t.startsWith("image/") ||
         t.includes("zip") ||
-        t.includes("octet-stream") // certains navigateurs
+        t.includes("octet-stream")
       );
     });
 
@@ -177,7 +174,6 @@ export default function OrderForm() {
       return;
     }
 
-    // 🔒 Recommandé : exiger au moins 1 fichier
     if (files.length === 0) {
       setError("Ajoutez au moins un fichier (PDF / image) avant de payer.");
       return;
@@ -190,7 +186,6 @@ export default function OrderForm() {
 
     setIsPaying(true);
     try {
-      // 1) Crée une commande draft (pending) -> orderId
       const draftRes = await fetch("/api/orders/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -212,7 +207,6 @@ export default function OrderForm() {
         return;
       }
 
-      // 2) Upload fichiers -> /api/orders/{orderId}/files
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f));
 
@@ -227,7 +221,6 @@ export default function OrderForm() {
         return;
       }
 
-      // 3) Lancer Stripe Checkout avec l'orderId existant
       const payRes = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -283,7 +276,6 @@ export default function OrderForm() {
               />
             </div>
 
-            {/* ✅ Upload */}
             <div className="rounded-2xl border border-gray-200 p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -331,7 +323,6 @@ export default function OrderForm() {
               )}
             </div>
 
-            {/* Product + Qty */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Produit</label>
@@ -372,7 +363,6 @@ export default function OrderForm() {
               </div>
             </div>
 
-            {/* Conditional options */}
             {form.productKind !== "affiches" && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>

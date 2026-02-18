@@ -78,7 +78,6 @@ export async function POST(req: Request) {
   try {
     const body = bodySchema.parse(await req.json());
 
-    // 1) pricing blocks
     const { data: blocks, error: blocksErr } = await supabaseAdmin
       .from("pricing_blocks")
       .select("*")
@@ -87,7 +86,6 @@ export async function POST(req: Request) {
     if (blocksErr) throw blocksErr;
     const allBlocks = (blocks ?? []) as PricingBlockRow[];
 
-    // 2) pricing serveur
     const priced = priceOrder(body.items as CartItem[], allBlocks);
 
     const subtotalHtCents = safeInt(priced.subtotalHtCents, 0);
@@ -98,7 +96,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Prix invalide (pricing serveur)." }, { status: 400 });
     }
 
-    // 3) create order pending
     const orderPayload: any = {
       status: "pending",
       currency: "eur",
@@ -121,7 +118,6 @@ export async function POST(req: Request) {
     if (orderErr) throw orderErr;
     const orderId = orderRow.id as string;
 
-    // 4) order_items
     const itemsRows = (body.items as CartItem[]).map((it, idx) => {
       const p = priced.items[idx];
 

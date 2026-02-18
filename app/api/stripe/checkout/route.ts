@@ -40,7 +40,6 @@ const cartItemSchema = z.discriminatedUnion("productKind", [
   affichesItemSchema,
 ]);
 
-// ✅ accepte soit orderId, soit l'ancien body
 const bodySchema = z.union([
   z.object({ orderId: z.string().min(1) }),
   z.object({
@@ -85,10 +84,6 @@ export async function POST(req: Request) {
   try {
     const json = await req.json();
     const body = bodySchema.parse(json);
-
-    // ============================
-    // MODE 1 (NOUVEAU): { orderId }
-    // ============================
     if ("orderId" in body) {
       const orderId = body.orderId;
 
@@ -148,10 +143,6 @@ export async function POST(req: Request) {
 
       return NextResponse.json({ url: session.url }, { status: 200 });
     }
-
-    // ============================
-    // MODE 2 (ANCIEN): { items, customerEmail }
-    // ============================
     const { customerEmail, items } = body;
 
     const { data: blocks, error: blocksErr } = await supabaseAdmin

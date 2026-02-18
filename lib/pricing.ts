@@ -17,7 +17,6 @@ const ROUNDING_MODE_BY_PRODUCT: Record<ProductKind, RoundingMode> = {
   affiches: "none",
 };
 
-// ✅ TVA par produit
 export const VAT_RATE_BY_PRODUCT: Record<ProductKind, number> = {
   professions_de_foi: 0.055,
   bulletins_de_vote: 0.055,
@@ -154,7 +153,6 @@ export function priceOrder(
 
   return {
     currency: "eur",
-    // ⚠️ on ne met plus vatRate global car mix 5,5% / 20%
     vatRate: 0,
     subtotalHtCents: subtotalHt,
     vatCents: vat,
