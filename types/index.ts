@@ -64,7 +64,7 @@ export type PricingBlockRow = {
   max_applications: number | null;
   is_active: boolean;
 
-  range_min: number;        // NEW
-  range_max: number | null; // NEW
+  range_min: number;       
+  range_max: number | null;
 };
 
