@@ -73,7 +73,10 @@ export default function RootLayout({
                   <h4 className="text-white font-semibold mb-4">Légal</h4>
                   <ul className="space-y-2 text-sm">
                     <li>
-                      <Link href="/cgv" className="hover:text-white transition-colors link-underline link-underline-black">
+                      <Link
+                        href="/cgv"
+                        className="relative inline-block hover:text-white transition-colors after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:w-full after:origin-left after:scale-x-0 after:bg-current after:transition-transform after:duration-300 hover:after:scale-x-100"
+                      >
                         Conditions générales de vente
                       </Link>
                     </li>
