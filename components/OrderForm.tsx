@@ -276,7 +276,7 @@ export default function OrderForm() {
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
-                           focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
+                          focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
                 placeholder="email@exemple.fr"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
@@ -337,7 +337,7 @@ export default function OrderForm() {
                 <label className="block text-sm font-medium text-gray-700">Produit</label>
                 <select
                   className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
-                             focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
+                            focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
                   value={form.productKind}
                   onChange={(e) => {
                     const k = e.target.value as ProductKind;
@@ -359,7 +359,7 @@ export default function OrderForm() {
                 <label className="block text-sm font-medium text-gray-700">Quantité</label>
                 <input
                   className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
-                             focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
+                            focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   placeholder="ex: 100"
@@ -379,7 +379,7 @@ export default function OrderForm() {
                   <label className="block text-sm font-medium text-gray-700">Impression</label>
                   <select
                     className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
-                               focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
+                              focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
                     value={(form as any).impression}
                     onChange={(e) =>
                       setForm((prev) => ({
@@ -398,7 +398,7 @@ export default function OrderForm() {
                     <label className="block text-sm font-medium text-gray-700">Format bulletin</label>
                     <select
                       className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
-                                 focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
+                                focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
                       value={(form as any).bulletinFormat}
                       onChange={(e) =>
                         setForm((prev) => ({
@@ -420,7 +420,7 @@ export default function OrderForm() {
                 <label className="block text-sm font-medium text-gray-700">Format affiche</label>
                 <select
                   className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm
-                             focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
+                            focus:border-gray-400 focus:outline-none focus:ring-4 focus:ring-gray-200"
                   value={(form as any).afficheFormat}
                   onChange={(e) =>
                     setForm((prev) => ({
@@ -440,7 +440,7 @@ export default function OrderForm() {
               onClick={onAddToCart}
               disabled={!canAdd}
               className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white
-                         shadow-sm transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        shadow-sm transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Ajouter au panier
             </button>
