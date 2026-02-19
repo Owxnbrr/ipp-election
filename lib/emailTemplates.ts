@@ -23,7 +23,7 @@ export function customerEmailHtml(params: {
     <p><b>Commande :</b> ${escapeHtml(params.orderId)}</p>
     <p><b>Total TTC :</b> ${euros} €</p>
 
-    <h3>Vos fichiers (liens valables 30 jours)</h3>
+    <h3>Vos fichiers</h3>
     <ul>${items || "<li>Aucun fichier</li>"}</ul>
 
     <p style="margin-top:18px;color:#666;font-size:12px">
