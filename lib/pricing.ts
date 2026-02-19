@@ -41,7 +41,7 @@ function roundQuantityForProduct(qty: number, productKind: ProductKind): number 
   // ✅ Bulletins : au-delà de 1000 => arrondi au 1000 (tes blocs sont en 1000)
   if (productKind === "bulletins_de_vote") {
     if (qty <= 1000) return Math.ceil(qty / 100) * 100;
-    return Math.ceil(qty / 1000) * 1000;
+    return Math.ceil(qty / 500) * 500;
   }
 
   // ✅ Professions de foi : option B (500)
