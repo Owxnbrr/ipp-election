@@ -38,8 +38,15 @@ function roundQuantityForProduct(qty: number, productKind: ProductKind): number 
   const mode = ROUNDING_MODE_BY_PRODUCT[productKind];
   if (mode === "none") return qty;
 
+  // ✅ Bulletins : au-delà de 1000 => arrondi au 1000 (car tes blocs sont en 1000)
+  if (productKind === "bulletins_de_vote") {
+    if (qty <= 1000) return Math.ceil(qty / 100) * 100;
+    return Math.ceil(qty / 1000) * 1000;
+  }
+
+  // ✅ Professions de foi : option B (500)
   if (qty <= 1000) return Math.ceil(qty / 100) * 100;
-  return Math.ceil(qty / 500) * 500; // ✅ Option B
+  return Math.ceil(qty / 500) * 500;
 }
 
 function inRange(b: PricingBlockRow, qty: number): boolean {
