@@ -2,7 +2,6 @@
 import type {
   CartItem,
   MoneyCents,
-  PricedItem,
   PricedOrder,
   PricingBlockRow,
   PricingBreakdownRow,
@@ -28,14 +27,25 @@ export function formatCents(cents: number, locale = "fr-FR"): string {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(euros);
 }
 
-function roundQuantityIfNeeded(qty: number, blocks: PricingBlockRow[], productKind: ProductKind): number {
+/**
+ * OPTION B (arrondi "doux") :
+ * - Professions de foi / Bulletins :
+ *   - jusqu’à 1000 => arrondi à la centaine sup.
+ *   - au-delà => arrondi au 500 sup.
+ * - Affiches : pas d’arrondi
+ */
+function roundQuantityForProduct(qty: number, productKind: ProductKind): number {
   const mode = ROUNDING_MODE_BY_PRODUCT[productKind];
   if (mode === "none") return qty;
 
-  const minBlock = Math.min(...blocks.map((b) => b.block_size));
-  if (!Number.isFinite(minBlock) || minBlock <= 0) return qty;
+  if (qty <= 1000) return Math.ceil(qty / 100) * 100;
+  return Math.ceil(qty / 500) * 500; // ✅ Option B
+}
 
-  return Math.ceil(qty / minBlock) * minBlock;
+function inRange(b: PricingBlockRow, qty: number): boolean {
+  const min = b.range_min ?? -Infinity;
+  const max = b.range_max ?? Infinity;
+  return qty >= min && qty <= max;
 }
 
 function labelForBlock(productKind: ProductKind, seq: number, blockSize: number): string {
@@ -44,22 +54,40 @@ function labelForBlock(productKind: ProductKind, seq: number, blockSize: number)
   return `Palier ${seq} (bloc ${blockSize})`;
 }
 
+/**
+ * Sélectionne la bonne grille :
+ * - même product_kind + options (impression / formats)
+ * - ET bonne tranche range_min/range_max (sur la quantité arrondie)
+ */
 function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): PricingBlockRow[] {
   const base = allBlocks.filter((b) => b.product_kind === item.productKind && b.is_active);
 
-  const filtered = base.filter((b) => {
+  const filteredByOptions = base.filter((b) => {
     if (item.productKind === "professions_de_foi") {
-      return b.impression === item.impression && b.bulletin_format === null && b.affiche_format === null;
+      return b.impression === item.impression && b.bulletin_format == null && b.affiche_format == null;
     }
     if (item.productKind === "bulletins_de_vote") {
-      return b.impression === item.impression && b.bulletin_format === item.bulletinFormat && b.affiche_format === null;
+      return (
+        b.impression === item.impression &&
+        b.bulletin_format === item.bulletinFormat &&
+        b.affiche_format == null
+      );
     }
-    return b.impression === null && b.bulletin_format === null && b.affiche_format === item.afficheFormat;
+    // affiches
+    return b.impression == null && b.bulletin_format == null && b.affiche_format === item.afficheFormat;
   });
 
-  return filtered.sort((a, b) => a.seq - b.seq);
+  const roundedQty = roundQuantityForProduct(item.quantity, item.productKind);
+  const filteredByRange = filteredByOptions.filter((b) => inRange(b, roundedQty));
+
+  return filteredByRange.sort((a, b) => a.seq - b.seq);
 }
 
+/**
+ * Calcule le prix via les blocs :
+ * - seq=1 = “base” (ex: première centaine / premier mille / les 10 000 premières etc)
+ * - seq>1 = incréments (ex: +100 / +500 / +1000 etc) selon block_size
+ */
 function applyBlocksPricing(
   productKind: ProductKind,
   originalQty: number,
@@ -69,7 +97,7 @@ function applyBlocksPricing(
     throw new Error(`Aucune grille tarifaire trouvée pour ${productKind} (options sélectionnées).`);
   }
 
-  const qty = roundQuantityIfNeeded(originalQty, blocks, productKind);
+  const qty = roundQuantityForProduct(originalQty, productKind);
 
   let remaining = qty;
   let total = 0;
@@ -79,12 +107,16 @@ function applyBlocksPricing(
     if (remaining <= 0) break;
 
     const maxApps = b.max_applications ?? Number.POSITIVE_INFINITY;
+
+    // Combien d'applications de ce bloc il faut pour couvrir le remaining
     const neededApps = Math.ceil(remaining / b.block_size);
     const applications = Math.min(neededApps, maxApps);
+
     if (applications <= 0) continue;
 
     const unitsCovered = Math.min(remaining, applications * b.block_size);
     const lineTotal = applications * b.block_price_cents;
+
     total += lineTotal;
 
     breakdown.push({
@@ -110,16 +142,19 @@ function applyBlocksPricing(
 export function priceCartItem(
   item: CartItem,
   allBlocks: PricingBlockRow[]
-): PricedItem & {
+): {
+  quantity: number;
+  unitHtCents: number;
+  totalHtCents: number;
+  breakdown: PricingBreakdownRow[];
   vatRate: number;
   vatCents: number;
   totalTtcCents: number;
-} {
+} & CartItem {
   const blocks = matchBlocksForItem(item, allBlocks);
   const { pricedQty, totalCents, breakdown } = applyBlocksPricing(item.productKind, item.quantity, blocks);
 
   const unit = Math.round(totalCents / pricedQty);
-
   const vatRate = VAT_RATE_BY_PRODUCT[item.productKind];
   const vatCents = Math.round(totalCents * vatRate);
   const totalTtcCents = totalCents + vatCents;
@@ -136,17 +171,13 @@ export function priceCartItem(
   };
 }
 
-export function priceOrder(
-  items: CartItem[],
-  allBlocks: PricingBlockRow[]
-): PricedOrder & {
+export function priceOrder(items: CartItem[], allBlocks: PricingBlockRow[]): PricedOrder & {
   subtotalHtCents: number;
   vatCents: number;
   totalTtcCents: number;
-  items: Array<PricedItem & { vatRate: number; vatCents: number; totalTtcCents: number }>;
+  items: Array<any>;
 } {
   const pricedItems = items.map((it) => priceCartItem(it, allBlocks));
-
   const subtotalHt = pricedItems.reduce((sum, it) => sum + it.totalHtCents, 0);
   const vat = pricedItems.reduce((sum, it) => sum + it.vatCents, 0);
   const totalTtc = subtotalHt + vat;
