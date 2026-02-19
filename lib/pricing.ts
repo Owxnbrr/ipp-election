@@ -57,7 +57,10 @@ function labelForBlock(productKind: ProductKind, seq: number, blockSize: number)
 /**
  * Sélectionne la bonne grille :
  * - même product_kind + options (impression / formats)
- * - ET bonne tranche range_min/range_max (sur la quantité arrondie)
+ * - ET une seule tranche range_min/range_max (sur la quantité arrondie)
+ *
+ * ✅ Fix : on ne garde qu'UNE tranche (la plus spécifique = range_min le plus élevé),
+ * sinon tu additionnes plusieurs "bases" (100 + 1000 + 10000 + 30000...) et le prix explose.
  */
 function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): PricingBlockRow[] {
   const base = allBlocks.filter((b) => b.product_kind === item.productKind && b.is_active);
@@ -78,9 +81,19 @@ function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): Prici
   });
 
   const roundedQty = roundQuantityForProduct(item.quantity, item.productKind);
-  const filteredByRange = filteredByOptions.filter((b) => inRange(b, roundedQty));
 
-  return filteredByRange.sort((a, b) => a.seq - b.seq);
+  // 1) On garde toutes les lignes qui matchent la quantité
+  const candidates = filteredByOptions.filter((b) => inRange(b, roundedQty));
+  if (candidates.length === 0) return [];
+
+  // 2) On choisit UNE seule tranche : celle dont range_min est le plus grand (la plus spécifique)
+  const bestRangeMin = Math.max(...candidates.map((b) => b.range_min ?? -Infinity));
+
+  // 3) On garde uniquement les lignes de cette tranche
+  const best = candidates.filter((b) => (b.range_min ?? -Infinity) === bestRangeMin);
+
+  // 4) Tri final
+  return best.sort((a, b) => a.seq - b.seq);
 }
 
 /**
