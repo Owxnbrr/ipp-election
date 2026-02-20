@@ -85,6 +85,11 @@ export default function RootLayout({
                         Politique de confidentialité
                       </Link>
                     </li>
+                    <li>
+                      <Link href="/mentions-legales" className="relative inline-block hover:text-white transition-colors after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:w-full after:origin-left after:scale-x-0 after:bg-current after:transition-transform after:duration-300 hover:after:scale-x-100">
+                        Mentions légales
+                      </Link>
+                    </li>
                   </ul>
                 </div>
                 <div>
