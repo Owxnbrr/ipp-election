@@ -27,24 +27,15 @@ export function formatCents(cents: number, locale = "fr-FR"): string {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(euros);
 }
 
-/**
- * OPTION B (arrondi "doux") :
- * - Professions de foi / Bulletins :
- *   - jusqu’à 1000 => arrondi à la centaine sup.
- *   - au-delà => arrondi au 500 sup.
- * - Affiches : pas d’arrondi
- */
 function roundQuantityForProduct(qty: number, productKind: ProductKind): number {
   const mode = ROUNDING_MODE_BY_PRODUCT[productKind];
   if (mode === "none") return qty;
 
-  // ✅ Bulletins : au-delà de 1000 => arrondi au 1000 (tes blocs sont en 1000)
   if (productKind === "bulletins_de_vote") {
     if (qty <= 1000) return Math.ceil(qty / 100) * 100;
     return Math.ceil(qty / 500) * 500;
   }
 
-  // ✅ Professions de foi : option B (500)
   if (qty <= 1000) return Math.ceil(qty / 100) * 100;
   return Math.ceil(qty / 500) * 500;
 }
@@ -62,14 +53,6 @@ function labelForBlock(productKind: ProductKind, seq: number, blockSize: number)
   return `Palier ${seq} (bloc ${blockSize})`;
 }
 
-/**
- * Sélectionne la bonne grille :
- * - même product_kind + options (impression / formats)
- * - ET une seule tranche range_min/range_max (sur la quantité arrondie)
- *
- * ✅ Fix : on ne garde qu'UNE tranche (la plus spécifique = range_min le plus élevé),
- * sinon tu additionnes plusieurs "bases" (100 + 1000 + 10000 + 30000...) et le prix explose.
- */
 function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): PricingBlockRow[] {
   const base = allBlocks.filter((b) => b.product_kind === item.productKind && b.is_active);
 
@@ -84,31 +67,21 @@ function matchBlocksForItem(item: CartItem, allBlocks: PricingBlockRow[]): Prici
         b.affiche_format == null
       );
     }
-    // affiches
     return b.impression == null && b.bulletin_format == null && b.affiche_format === item.afficheFormat;
   });
 
   const roundedQty = roundQuantityForProduct(item.quantity, item.productKind);
 
-  // 1) On garde toutes les lignes qui matchent la quantité
   const candidates = filteredByOptions.filter((b) => inRange(b, roundedQty));
   if (candidates.length === 0) return [];
 
-  // 2) On choisit UNE seule tranche : celle dont range_min est le plus grand (la plus spécifique)
   const bestRangeMin = Math.max(...candidates.map((b) => b.range_min ?? -Infinity));
 
-  // 3) On garde uniquement les lignes de cette tranche
   const best = candidates.filter((b) => (b.range_min ?? -Infinity) === bestRangeMin);
 
-  // 4) Tri final
   return best.sort((a, b) => a.seq - b.seq);
 }
 
-/**
- * Calcule le prix via les blocs :
- * - seq=1 = “base” (ex: première centaine / premier mille / les 10 000 premières etc)
- * - seq>1 = incréments (ex: +100 / +500 / +1000 etc) selon block_size
- */
 function applyBlocksPricing(
   productKind: ProductKind,
   originalQty: number,
@@ -129,7 +102,6 @@ function applyBlocksPricing(
 
     const maxApps = b.max_applications ?? Number.POSITIVE_INFINITY;
 
-    // Combien d'applications de ce bloc il faut pour couvrir le remaining
     const neededApps = Math.ceil(remaining / b.block_size);
     const applications = Math.min(neededApps, maxApps);
 
