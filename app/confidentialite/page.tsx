@@ -103,7 +103,7 @@ export default function ConfidentialitePage() {
                 <li><strong>Droit à la portabilité :</strong> recevoir vos données dans un format structuré</li>
               </ul>
               <p className="text-gray-700 mt-4">
-                Pour exercer ces droits, contactez-nous à : contact@electionprint.fr
+                Pour exercer ces droits, contactez-nous à : contact@ipp-imprimerie.fr
               </p>
             </section>
 
@@ -131,7 +131,7 @@ export default function ConfidentialitePage() {
                 personnelles, contactez-nous :
               </p>
               <ul className="list-none text-gray-700 mt-4">
-                <li>Email : contact@electionprint.fr</li>
+                <li>Email : contact@ipp-imprimerie.fr</li>
                 <li>Téléphone : 01 23 45 67 89</li>
                 <li>Adresse : 6 rue Dupuy, Montdidier</li>
               </ul>

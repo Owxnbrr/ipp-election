@@ -9,7 +9,7 @@ export default function CGVPage() {
               <h2 className="text-2xl font-bold mb-4">1. Objet</h2>
               <p className="text-gray-700">
                 Les présentes Conditions Générales de Vente (CGV) régissent les relations contractuelles
-                entre ElectionPrint et les mairies clientes pour la fourniture de services d&apos;impression
+                entre IPP et les mairies clientes pour la fourniture de services d&apos;impression
                 de documents électoraux (affiches, bulletins de vote, professions de foi).
               </p>
             </section>
