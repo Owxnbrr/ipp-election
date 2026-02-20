@@ -24,7 +24,7 @@ export default function MentionsLegalesPage() {
             <strong>SIRET (siège) :</strong> 790 798 292 00013
           </li>
           <li>
-            <strong>RCS :</strong> Amiens (à compléter avec le libellé exact du Kbis)
+            <strong>RCS :</strong> Amiens
           </li>
           <li>
             <strong>Code APE/NAF :</strong> 70.21Z — Conseil en relations publiques et
@@ -34,7 +34,7 @@ export default function MentionsLegalesPage() {
             <strong>TVA intracommunautaire :</strong> FR25 790798292
           </li>
           <li>
-            <strong>Directeur de la publication :</strong> Vincent Timon (à vérifier)
+            <strong>Directeur de la publication :</strong> Bucheton Noah
           </li>
           <li>
             <strong>Téléphone :</strong> 03 22 78 01 25
