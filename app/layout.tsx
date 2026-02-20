@@ -29,7 +29,7 @@ export default function RootLayout({
           <header className="bg-white border-b border-gray-200">
             <div className="container mx-auto px-4 py-4">
               <nav className="flex items-center justify-between">
-                <img className="h-10 w-auto" src="/img/logo.png" alt="logo ipp" />
+                <a href="/"><img className="h-10 w-auto" src="/img/logo.png" alt="logo ipp" /></a>
                 <div className="flex items-center gap-6">
                   <Link 
                     href="/commande" 
@@ -91,7 +91,8 @@ export default function RootLayout({
                   <h4 className="text-white font-semibold mb-4">Contact</h4>
                   <p className="text-sm">
                     Email: contact@ipp-imprimerie.fr<br />
-                    Tél: 03 22 78 01 25
+                    Tél: 03 22 78 01 25<br />
+                    Adresse: 6 rue Dupuy, 80500 Montdidier
                   </p>
                 </div>
               </div>

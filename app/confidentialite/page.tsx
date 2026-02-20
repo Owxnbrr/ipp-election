@@ -132,7 +132,7 @@ export default function ConfidentialitePage() {
               </p>
               <ul className="list-none text-gray-700 mt-4">
                 <li>Email : contact@ipp-imprimerie.fr</li>
-                <li>Téléphone : 01 23 45 67 89</li>
+                <li>Téléphone : 03 22 78 01 25</li>
                 <li>Adresse : 6 rue Dupuy, Montdidier</li>
               </ul>
               <p className="text-gray-700 mt-4">

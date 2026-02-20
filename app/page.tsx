@@ -30,7 +30,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-bold mb-3">Affiches électorales</h3>
               <p className="text-gray-600 mb-4">
-                Formats réglementaires pour l’affichage : <strong>Petit format (297×420)</strong> ou{" "}
+                Formats pour l’affichage : <strong>Petit format (297×420)</strong> ou{" "}
                 <strong>Grand format (594×841)</strong>. Impression soignée, prête à poser.
               </p>
               <ul className="text-sm text-gray-600 space-y-2">
