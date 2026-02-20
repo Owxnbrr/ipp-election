@@ -34,7 +34,7 @@ export default function MentionsLegalesPage() {
             <strong>TVA intracommunautaire :</strong> FR25 790798292
           </li>
           <li>
-            <strong>Directeur de la publication :</strong> Bucheton Noah
+            <strong>Directeur de la publication :</strong> Mélanie Sylvie LEREBOURG
           </li>
           <li>
             <strong>Téléphone :</strong> 03 22 78 01 25
@@ -54,8 +54,7 @@ export default function MentionsLegalesPage() {
       <section className="mt-10 space-y-3">
         <h2 className="text-xl font-semibold">Hébergement</h2>
         <p>
-          Le site est hébergé par <strong>Netlify, Inc.</strong> (à compléter avec les
-          coordonnées officielles de l’hébergeur si nécessaire).
+          Le site est hébergé par <strong>Netlify, Inc.</strong>.
         </p>
       </section>
 
